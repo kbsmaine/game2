@@ -1,0 +1,13 @@
+DEADHAUL Build 2.4.0 — Ch15 Live Player Body
+
+- Ch15 is now the live gameplay character in bunker and raids.
+- Full rig follows the collision controller and turns with camera yaw.
+- First-person camera is positioned forward of the face to avoid skull clipping.
+- Separate fp_arms remain dedicated to clean weapon handling.
+- Body awareness: real Ch15 torso/legs/feet/gear can be seen when looking down.
+- Added procedural full-body idle/walk/sprint locomotion on Mixamo bones.
+- Armor, rig, backpack and helmet are attached to the live Ch15 skeleton in gameplay.
+- Added bone-attached player hit zones for head/chest/pelvis/arms/legs.
+- Invisible movement box is now collision only and no longer takes bullet hits.
+- Added player shadow casting on surface raids.
+- Build cache/version bumped to 2.4.0 and local port to 8789.
