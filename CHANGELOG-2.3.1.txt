@@ -1,8 +1,0 @@
-DEADHAUL Build 2.3.1
-
-- Fixed violent first-person arm/weapon vibration after sustained sprinting.
-- Added sprint exhaustion hysteresis: once stamina is exhausted, sprint cannot re-engage every frame around the low-stamina threshold.
-- Player must release Shift and recover to 20 stamina before sprint becomes available again.
-- Fire spread now uses actual sprint state instead of raw Shift key state.
-- Sprint exhaustion state resets correctly between raids and bunker transitions.
-- Local test port bumped to 8787.
