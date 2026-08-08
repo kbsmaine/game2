@@ -10,11 +10,11 @@
   const $=id=>document.getElementById(id);
   const C=A.catalog;
   async function loadJsonConfig(path,fallback={}){try{const r=await fetch(path,{cache:'no-store'});if(!r.ok)throw new Error(String(r.status));return await r.json()}catch(err){console.warn('DEADHAUL config fallback',path,err);return fallback}}
-  const MODEL_CONFIG=await loadJsonConfig('data/models.json?v=2.6.1',{characters:{},firstPerson:{file:'fp_arms',weaponBone:'Hand_R'},raiders:[],weapons:{},gear:{}});
+  const MODEL_CONFIG=await loadJsonConfig('data/models.json?v=2.6.2',{characters:{},firstPerson:{file:'fp_arms',weaponBone:'Hand_R'},raiders:[],weapons:{},gear:{}});
   const WEAPON_MEDIA=await loadJsonConfig('data/weapons.json?v=2.4.0',{weapons:{}});
   const FP_ANIM=await loadJsonConfig('data/animations.json?v=2.4.0',{weaponProfiles:{},holds:{},actions:{},stateOffsets:{}});
 
-  // Build 2.6.1 — custom animated enemy characters + weapon-class Mixamo locomotion + live weapon alignment editor. The JSON file remains the source of truth;
+  // Build 2.6.2 — custom animated enemy characters + weapon-class Mixamo locomotion + live weapon alignment editor. The JSON file remains the source of truth;
   // editor changes are temporary unless copied/saved to browser.
   const ORIGINAL_WEAPON_MOUNTS=Object.fromEntries(Object.entries(MODEL_CONFIG.weapons||{}).map(([id,c])=>[id,JSON.parse(JSON.stringify(c.mixamoFp||{}))]));
   const WEAPON_EDITOR_STORAGE_KEY='deadhaul_weapon_alignment_overrides_v4';
@@ -473,16 +473,169 @@
       ['armL','UpperArm_L',[.18,.40,.18],[0,-.17,0],.72],['armR','UpperArm_R',[.18,.40,.18],[0,-.17,0],.72],['legL','UpperLeg_L',[.22,.60,.22],[0,-.27,0],.78],['legR','UpperLeg_R',[.22,.60,.22],[0,-.27,0],.78]
     ],out=[];for(const[name,boneName,size,pos,multiplier]of defs){const bone=boneByName(e.rig,boneName);if(!bone)continue;const h=BABYLON.MeshBuilder.CreateBox('ENEMY_HIT_'+name,{width:size[0],height:size[1],depth:size[2]},scene);h.isVisible=true;h.visibility=0;h.isPickable=true;h.checkCollisions=false;h.metadata={enemyPart:true,enemyHitbox:true,enemyRef:e,multiplier};try{h.attachToBone(bone,e.rig.skinMesh||e.rig.root)}catch{h.parent=e.rig.root}h.position=new BABYLON.Vector3(...pos);out.push(h)}return out}
   function configureImportedEnemyRig(scene,e){if(!e?.rig)return;if(e.variant?.boneHitboxes){for(const m of e.rig.meshes||[]){if(!(m.getTotalVertices&&m.getTotalVertices()>0))continue;m.isPickable=false;m.metadata={...(m.metadata||{}),ignoreBullet:true,enemyVisual:true}}e.hitboxes=createEnemyBoneHitboxes(scene,e)}else configureCharacterMeshes(e.rig,e)}
-  function createEnemyPhysicsRagdoll(e){if(!e?.rig?.skeleton||!e.rig.root||typeof BABYLON.Ragdoll!=='function')return null;const ragScene=e.rig.root.getScene?.();if(!ragScene?.metadata?.deadhaulPhysics)return null;try{const rootBone=e.rig.skeleton.getChildren?.()?.[0],rootName=rootBone?.name||boneByName(e.rig,'Hips')?.name;if(!rootName)return null;const cfg=[],used=new Set();const add=(alias,w,h,d,mass,extra={})=>{const bone=alias==='__ROOT__'?rootBone:boneByName(e.rig,alias);if(!bone||used.has(bone.name))return;used.add(bone.name);cfg.push({bone:bone.name,width:w,height:h,depth:d,mass,restitution:.02,...extra})};add('__ROOT__',.34,.30,.28,12);add('Hips',.34,.30,.28,12);add('Spine',.34,.30,.25,7);add('Chest',.44,.38,.29,10);add('Head',.25,.28,.25,4);add('UpperArm_L',.16,.34,.16,3,{putBoxInBoneCenter:true,joint:BABYLON.PhysicsConstraintType?.BALL_AND_SOCKET??1});add('LowerArm_L',.14,.31,.14,2,{putBoxInBoneCenter:true});add('UpperArm_R',.16,.34,.16,3,{putBoxInBoneCenter:true,joint:BABYLON.PhysicsConstraintType?.BALL_AND_SOCKET??1});add('LowerArm_R',.14,.31,.14,2,{putBoxInBoneCenter:true});add('UpperLeg_L',.20,.46,.20,7,{putBoxInBoneCenter:true,joint:BABYLON.PhysicsConstraintType?.BALL_AND_SOCKET??1});add('LowerLeg_L',.18,.43,.18,5,{putBoxInBoneCenter:true});add('UpperLeg_R',.20,.46,.20,7,{putBoxInBoneCenter:true,joint:BABYLON.PhysicsConstraintType?.BALL_AND_SOCKET??1});add('LowerLeg_R',.18,.43,.18,5,{putBoxInBoneCenter:true});if(!cfg.length||cfg[0].bone!==rootName){console.warn('Enemy ragdoll root config mismatch',rootName);return null}const rd=new BABYLON.Ragdoll(e.rig.skeleton,e.rig.root,cfg);e.physicsRagdollBoneNames=cfg.map(x=>x.bone);return rd}catch(err){console.warn('Enemy Havok ragdoll setup failed',e?.variant?.label||'',err);return null}}
+  function createEnemyPhysicsRagdoll(e){
+    if(!e?.rig?.skeleton||!e.rig.root||typeof BABYLON.Ragdoll!=='function')return null;
+    const ragScene=e.rig.root.getScene?.();
+    if(!ragScene?.metadata?.deadhaulPhysics)return null;
+    try{
+      const rootBone=e.rig.skeleton.getChildren?.()?.[0],rootName=rootBone?.name||boneByName(e.rig,'Hips')?.name;
+      if(!rootName)return null;
+      const cfg=[],used=new Set();
+      const add=(alias,w,h,d,mass,extra={})=>{
+        const bone=alias==='__ROOT__'?rootBone:boneByName(e.rig,alias);
+        if(!bone||used.has(bone.name))return;
+        used.add(bone.name);
+        // Build 2.6.2: conservative, non-overlapping body proxies. Babylon's built-in
+        // ragdoll uses box bodies and unrestricted ball joints, so oversized proxies
+        // create violent solver corrections when the ragdoll is enabled.
+        cfg.push({bone:bone.name,width:w,height:h,depth:d,mass,restitution:0,...extra});
+      };
+      add('__ROOT__',.28,.23,.22,10);
+      add('Spine',.26,.22,.20,6,{putBoxInBoneCenter:true});
+      add('Chest',.34,.28,.23,9,{putBoxInBoneCenter:true});
+      add('Head',.20,.22,.20,4,{putBoxInBoneCenter:true});
+      add('UpperArm_L',.11,.27,.11,2.2,{putBoxInBoneCenter:true,joint:BABYLON.PhysicsConstraintType?.BALL_AND_SOCKET??1});
+      add('LowerArm_L',.095,.24,.095,1.6,{putBoxInBoneCenter:true});
+      add('UpperArm_R',.11,.27,.11,2.2,{putBoxInBoneCenter:true,joint:BABYLON.PhysicsConstraintType?.BALL_AND_SOCKET??1});
+      add('LowerArm_R',.095,.24,.095,1.6,{putBoxInBoneCenter:true});
+      add('UpperLeg_L',.14,.36,.14,5.2,{putBoxInBoneCenter:true,joint:BABYLON.PhysicsConstraintType?.BALL_AND_SOCKET??1});
+      add('LowerLeg_L',.12,.34,.12,3.8,{putBoxInBoneCenter:true});
+      add('UpperLeg_R',.14,.36,.14,5.2,{putBoxInBoneCenter:true,joint:BABYLON.PhysicsConstraintType?.BALL_AND_SOCKET??1});
+      add('LowerLeg_R',.12,.34,.12,3.8,{putBoxInBoneCenter:true});
+      if(!cfg.length||cfg[0].bone!==rootName){console.warn('Enemy ragdoll root config mismatch',rootName);return null}
+      const rd=new BABYLON.Ragdoll(e.rig.skeleton,e.rig.root,cfg);
+      e.physicsRagdollBoneNames=cfg.map(x=>x.bone);
+      return rd;
+    }catch(err){console.warn('Enemy Havok ragdoll setup failed',e?.variant?.label||'',err);return null}
+  }
+  function ragdollAggregates(e){
+    const out=[],seen=new Set(),rd=e?.physicsRagdoll;
+    if(!rd)return out;
+    const indices=[-1,...Array.from({length:e.physicsRagdollBoneNames?.length||0},(_,i)=>i)];
+    for(const i of indices){
+      try{const a=rd.getAggregate?.(i);if(a&&!seen.has(a)){seen.add(a);out.push(a)}}catch{}
+    }
+    return out;
+  }
+  function configureStableRagdollPhysics(e){
+    // Give all pieces the same membership bit and exclude that bit from their own
+    // collide mask. Limbs still collide with the level, but not with each other.
+    // That removes the most common source of "exploding" ragdolls: overlapping
+    // arm/torso/leg boxes solving against neighboring boxes at activation.
+    const membership=0x2,collideMask=0xFFFFFFFD;
+    for(const a of ragdollAggregates(e)){
+      try{if(a.shape){a.shape.filterMembershipMask=membership;a.shape.filterCollideMask=collideMask}}catch{}
+      try{if(a.material){a.material.friction=.78;a.material.restitution=0}}catch{}
+      try{a.body?.setLinearDamping?.(.58);a.body?.setAngularDamping?.(.82)}catch{}
+      try{a.body?.setLinearVelocity?.(BABYLON.Vector3.Zero())}catch{}
+      try{a.body?.setAngularVelocity?.(BABYLON.Vector3.Zero())}catch{}
+    }
+  }
+  function finiteVec3(v){return !!v&&[v.x,v.y,v.z].every(Number.isFinite)}
+  function capBodyVelocity(body,maxLinear,maxAngular){
+    if(!body)return;
+    try{
+      const lv=body.getLinearVelocity?.();
+      if(finiteVec3(lv)){
+        const n=lv.length();
+        if(n>maxLinear&&n>0)body.setLinearVelocity?.(lv.scale(maxLinear/n));
+      }
+    }catch{}
+    try{
+      const av=body.getAngularVelocity?.();
+      if(finiteVec3(av)){
+        const n=av.length();
+        if(n>maxAngular&&n>0)body.setAngularVelocity?.(av.scale(maxAngular/n));
+      }
+    }catch{}
+  }
   function physicsRagdollPosition(e){try{const a=e?.physicsRagdoll?.getAggregate?.(-1),p=a?.transformNode?.getAbsolutePosition?.()||a?.transformNode?.position;return p?.clone?.()||null}catch{return null}}
   function createEnemy(scene,pos,opts={}){const motionRoot=new BABYLON.TransformNode('raiderMotion',scene);motionRoot.position=new BABYLON.Vector3(...pos);const collider=collisionBox(scene,'enemy',[.68,1.8,.68],[pos[0],.9,pos[2]]);collider.metadata={ignoreBullet:true,enemyCollider:true};const tier=opts.tier||1,weapon=opts.weapon||choose(tier>=3?['ak74','m4a1','mp5','sks']:tier===2?['ak74','mp5','sks','pump12']:['makarov','glock17','sks']);const variants=MODEL_CONFIG.raiders||[];const v=opts.variant||variants[Math.min(variants.length-1,Math.max(0,tier-1))]||variants[Math.floor(Math.random()*Math.max(1,variants.length))]||{file:'raider_01',weaponBone:'Hand_R'};const e={root:motionRoot,rig:null,collider,health:90+tier*18,dead:false,tier,weapon,variant:v,hitboxes:[],nextShot:performance.now()+rand(600,1900),lootProfile:opts.lootProfile||'civilian',patrol:new BABYLON.Vector3(pos[0]+rand(-8,8),0,pos[2]+rand(-8,8)),speed:1.05+tier*.12,walkCycle:rand(0,6),ragdoll:null,physicsRagdoll:null,weaponRoot:null};enemies.push(e);(async()=>{try{const rig=await loadRiggedModel(scene,v.file,[0,0,0],{scale:v.scale??1,pickable:true,name:'raiderRig'});if(e.dead||isDisposedSafe(motionRoot)||motionRoot.getScene()!==scene){rig.root.dispose(false,true);return}rig.root.parent=motionRoot;rig.root.position.set(0,0,0);e.rig=rig;configureImportedEnemyRig(scene,e);if(v.authoredAnimations)startAuthoredLocomotion(rig,enemyAuthoredClip(e,false,false,false),1);e.physicsRagdoll=createEnemyPhysicsRagdoll(e);const wm=WEAPONS[weapon]?.model;if(wm){const base=MODEL_CONFIG.weapons?.[weapon]?.world||{},extra=v.weaponMount||{},wc={position:extra.position||base.position||[0,0,0],rotation:extra.rotation||base.rotation||[0,0,0],scale:(base.scale??1)*(extra.scale??1)};const gun=await loadModel(scene,wm,[0,0,0],{collision:false,pickable:false,scale:1});if(e.dead||isDisposedSafe(motionRoot)){gun.dispose();return}attachAssetToBone(gun,boneByName(rig,v.weaponBone||'Hand_R'),rig.skinMesh||rig.root,wc);for(const mm of gun.getChildMeshes?.()||[])mm.metadata={...(mm.metadata||{}),ignoreBullet:true};e.weaponRoot=gun}}catch(err){console.warn('raider rig load failed',v.file,err)}})();return e}
   function enemyStep(dt){if(sceneMode!=='raid'||playerDead||anyPanelOpen()||!playerBody)return;for(const e of enemies){if(e.dead||isDisposedSafe(e.root))continue;const ep=e.root.position,pp=playerBody.position,dx=pp.x-ep.x,dz=pp.z-ep.z,dist=Math.hypot(dx,dz);const sees=dist<48;e.walkCycle+=dt*(dist>11?7:2.2);let moving=false,fast=false;if(sees){e.root.rotation.y=Math.atan2(dx,dz);if(dist>11){const dir=new BABYLON.Vector3(dx,0,dz).normalize();const d=dir.scale(e.speed*dt);e.collider.moveWithCollisions(d);e.root.position.x=e.collider.position.x;e.root.position.z=e.collider.position.z;moving=true;fast=true}if(dist<42&&performance.now()>e.nextShot){enemyFire(e,dist);const w=WEAPONS[e.weapon]||WEAPONS.makarov;e.nextShot=performance.now()+60000/w.rpm*rand(1.4,2.8)}}else{const dx2=e.patrol.x-ep.x,dz2=e.patrol.z-ep.z;if(Math.hypot(dx2,dz2)<1.5)e.patrol=new BABYLON.Vector3(ep.x+rand(-10,10),0,ep.z+rand(-10,10));else{const dir=new BABYLON.Vector3(dx2,0,dz2).normalize();e.collider.moveWithCollisions(dir.scale(e.speed*.5*dt));e.root.position.x=e.collider.position.x;e.root.position.z=e.collider.position.z;e.root.rotation.y=Math.atan2(dir.x,dir.z);moving=true}}if(!updateEnemyAuthoredAnimation(e,moving,fast,sees)){animateRigLegs(e.rig,fast?.30:moving?.16:.025,e.walkCycle);applyWorldWeaponPose(e.rig,e.weapon)}}}
   function enemyFire(e,dist){const w=WEAPONS[e.weapon]||WEAPONS.makarov;const origin=e.root.position.add(new BABYLON.Vector3(0,1.55,0)),target=currentCamera.position.clone(),dir=target.subtract(origin).normalize();const inaccuracy=.014+dist*.00065+(e.tier===1?.012:0);dir.x+=rand(-inaccuracy,inaccuracy);dir.y+=rand(-inaccuracy,inaccuracy);dir.z+=rand(-inaccuracy,inaccuracy);dir.normalize();spawnBullet('enemy',origin,dir,w.velocity,w.damage*.72);playGun(e.weapon,e.root.position)}
   function damageEnemy(e,amount,point,dir){if(!e||e.dead)return;e.health-=amount;spawnBlood(point,dir);if(e.health<=0)killEnemy(e,dir)}
-  function killEnemy(e,shotDir){if(e.dead)return;e.dead=true;for(const g of animationGroupsOf(e.rig))try{g.stop()}catch{};for(const h of e.hitboxes||[]){h.isPickable=false;h.metadata={...(h.metadata||{}),ignoreBullet:true}}const deathPos=e.root.position.clone(),dir=(shotDir&&shotDir.lengthSquared?.()>0?shotDir.clone():new BABYLON.Vector3(rand(-1,1),0,rand(-1,1))).normalize();e.collider.isPickable=false;e.collider.checkCollisions=false;e.collider.metadata={...(e.collider.metadata||{}),ignoreBullet:true,deadEnemyCollider:true};try{e.collider.setEnabled(false)}catch{}for(const m of e.rig?.meshes||[]){m.isPickable=false;m.metadata={...(m.metadata||{}),ignoreBullet:true,ragdollVisual:true}}let physics=false,rootAggregate=null;if(e.physicsRagdoll){try{e.physicsRagdoll.ragdoll();for(let i=0;i<(e.physicsRagdollBoneNames||[]).length;i++){try{const body=e.physicsRagdoll.getAggregate(i)?.body;body?.setLinearDamping?.(.10);body?.setAngularDamping?.(.14)}catch{}}rootAggregate=e.physicsRagdoll.getAggregate(-1);const impulse=new BABYLON.Vector3(dir.x*3.4,1.25+Math.abs(dir.y)*1.1,dir.z*3.4);rootAggregate?.body?.setLinearVelocity?.(impulse);rootAggregate?.body?.setAngularVelocity?.(new BABYLON.Vector3(rand(-2.6,2.6),rand(-1.2,1.2),rand(-2.6,2.6)));const chestName=boneByName(e.rig,'Chest')?.name,chestIndex=(e.physicsRagdollBoneNames||[]).indexOf(chestName);const chestAgg=chestIndex>=0?e.physicsRagdoll.getAggregate(chestIndex):null;if(chestAgg?.body?.applyImpulse){const at=chestAgg.transformNode?.position||deathPos;chestAgg.body.applyImpulse(new BABYLON.Vector3(dir.x*3.0,.8+Math.abs(dir.y),dir.z*3.0),at)}physics=true}catch(err){console.warn('Enemy ragdoll activation failed — using fallback',err);physics=false}}e.ragdoll=physics?{t:0,physics:true,rag:e.physicsRagdoll,rootAggregate,trigger:null}:{t:0,physics:false,vel:new BABYLON.Vector3(dir.x*3.6,1.45+Math.abs(dir.y)*1.2,dir.z*3.6),angVel:new BABYLON.Vector3(rand(-2.2,2.2),rand(-1.0,1.0),rand(-2.6,2.6)),grounded:false,limbSeed:rand(0,20),fallSide:Math.random()<.5?-1:1,twist:rand(-.7,.7),collider:e.collider,rootOffsetY:.9,trigger:null};ragdolls.push(e);const corpsePos=physicsRagdollPosition(e)||deathPos;const trigger=interactionTrigger(currentScene,'corpse',[corpsePos.x,corpsePos.y+.55,corpsePos.z],[1.8,2,1.8]);e.ragdoll.trigger=trigger;const loot={name:'FALLEN RAIDER',items:rollEnemyLoot(e)};e.ragdoll.interaction=addInteraction(trigger,'SEARCH BODY',()=>openLoot(loot),2.5,[corpsePos.x,corpsePos.y+.55,corpsePos.z]);toast(physics?'HOSTILE DOWN // PHYSICS RAGDOLL':'HOSTILE DOWN')}
-  function ragdollStep(dt){for(const e of ragdolls){const r=e.ragdoll;if(!r||!e.rig||isDisposedSafe(e.root))continue;r.t+=dt;if(r.physics){const p=physicsRagdollPosition(e);if(p){if(r.trigger&&!isDisposedSafe(r.trigger))r.trigger.position.set(p.x,p.y+.55,p.z);if(r.interaction){r.interaction.point.set(p.x,p.y+.55,p.z);r.interaction.bounds=null}}continue}if(isDisposedSafe(r.collider))continue;r.vel.y-=12.5*dt;const before=r.collider.position.clone(),requested=r.vel.scale(dt);try{r.collider.setEnabled(true);r.collider.moveWithCollisions(requested)}catch{r.collider.position.addInPlace(requested)}const moved=r.collider.position.subtract(before);if(requested.y<-.001&&Math.abs(moved.y-requested.y)>.008){r.grounded=true;r.vel.y=Math.max(0,-r.vel.y*.06);r.vel.x*=Math.pow(.12,dt);r.vel.z*=Math.pow(.12,dt)}else r.grounded=false;if(Math.abs(moved.x-requested.x)>.02)r.vel.x*=-.22;if(Math.abs(moved.z-requested.z)>.02)r.vel.z*=-.22;e.root.position.set(r.collider.position.x,r.collider.position.y-r.rootOffsetY,r.collider.position.z);r.angVel.scaleInPlace(Math.pow(r.grounded?.08:.42,dt));e.root.rotation.x+=r.angVel.x*dt;e.root.rotation.y+=r.angVel.y*dt;e.root.rotation.z+=r.angVel.z*dt;const settle=clamp(r.t/1.15,0,1),impact=Math.exp(-r.t*2.4),flop=Math.sin(r.t*8+r.limbSeed)*impact;const side=r.fallSide,tw=r.twist;const b=n=>boneByName(e.rig,n);setBoneEuler(b('Spine'),tw*.18*settle,0,side*.08*settle);setBoneEuler(b('Chest'),tw*.22*settle,0,side*.18*settle);setBoneEuler(b('Neck'),-.12*settle,tw*.12,0);setBoneEuler(b('Head'),.18*settle,tw*.18,side*.12);setBoneEuler(b('UpperArm_L'),-.62*settle+flop*.42,tw*.15,-.88*side*settle);setBoneEuler(b('UpperArm_R'),-.48*settle-flop*.36,-tw*.12,.76*side*settle);setBoneEuler(b('LowerArm_L'),-.82*settle+flop*.20,0,.28*flop);setBoneEuler(b('LowerArm_R'),-.68*settle-flop*.18,0,-.25*flop);setBoneEuler(b('UpperLeg_L'),.44*settle+flop*.20,0,.22*side);setBoneEuler(b('UpperLeg_R'),-.34*settle-flop*.18,0,-.22*side);setBoneEuler(b('LowerLeg_L'),-.58*settle+Math.max(0,flop)*.18,0,0);setBoneEuler(b('LowerLeg_R'),-.42*settle+Math.max(0,-flop)*.18,0,0);if(r.trigger&&!isDisposedSafe(r.trigger))r.trigger.position.set(e.root.position.x,e.root.position.y+1,e.root.position.z);if(r.interaction){r.interaction.point.set(e.root.position.x,e.root.position.y+1,e.root.position.z);r.interaction.bounds=null}if(r.t>3.0&&r.grounded){r.vel.x*=.6;r.vel.z*=.6;r.angVel.scaleInPlace(.5)}}}
-
-
+  function killEnemy(e,shotDir){
+    if(e.dead)return;
+    e.dead=true;
+    for(const g of animationGroupsOf(e.rig))try{g.stop()}catch{}
+    for(const h of e.hitboxes||[]){h.isPickable=false;h.metadata={...(h.metadata||{}),ignoreBullet:true}}
+    const deathPos=e.root.position.clone(),dir=(shotDir&&shotDir.lengthSquared?.()>0?shotDir.clone():new BABYLON.Vector3(rand(-1,1),0,rand(-1,1))).normalize();
+    e.collider.isPickable=false;e.collider.checkCollisions=false;e.collider.metadata={...(e.collider.metadata||{}),ignoreBullet:true,deadEnemyCollider:true};
+    try{e.collider.setEnabled(false)}catch{}
+    for(const m of e.rig?.meshes||[]){m.isPickable=false;m.metadata={...(m.metadata||{}),ignoreBullet:true,ragdollVisual:true}}
+    let physics=false,rootAggregate=null;
+    if(e.physicsRagdoll){
+      try{
+        e.physicsRagdoll.ragdoll();
+        configureStableRagdollPhysics(e);
+        rootAggregate=e.physicsRagdoll.getAggregate(-1);
+        // A rifle round should make a body collapse, not launch it across the room.
+        // Apply only a subtle impact to the chest; gravity supplies the actual fall.
+        const chestName=boneByName(e.rig,'Chest')?.name,chestIndex=(e.physicsRagdollBoneNames||[]).indexOf(chestName);
+        const chestAgg=chestIndex>=0?e.physicsRagdoll.getAggregate(chestIndex):null;
+        if(chestAgg?.body?.applyImpulse){
+          const at=chestAgg.transformNode?.getAbsolutePosition?.()||chestAgg.transformNode?.position||deathPos;
+          chestAgg.body.applyImpulse(new BABYLON.Vector3(dir.x*.42,.06+Math.max(0,dir.y)*.12,dir.z*.42),at);
+        }
+        physics=true;
+      }catch(err){console.warn('Enemy ragdoll activation failed — using fallback',err);physics=false}
+    }
+    e.ragdoll=physics?{
+      t:0,physics:true,rag:e.physicsRagdoll,rootAggregate,trigger:null,
+      stabilizeFor:.75,settleFor:4.0
+    }:{t:0,physics:false,vel:new BABYLON.Vector3(dir.x*.55,.25+Math.abs(dir.y)*.2,dir.z*.55),angVel:new BABYLON.Vector3(rand(-.45,.45),rand(-.2,.2),rand(-.45,.45)),grounded:false,limbSeed:rand(0,20),fallSide:Math.random()<.5?-1:1,twist:rand(-.35,.35),collider:e.collider,rootOffsetY:.9,trigger:null};
+    ragdolls.push(e);
+    const corpsePos=physicsRagdollPosition(e)||deathPos;
+    const trigger=interactionTrigger(currentScene,'corpse',[corpsePos.x,corpsePos.y+.55,corpsePos.z],[1.8,2,1.8]);
+    e.ragdoll.trigger=trigger;
+    const loot={name:'FALLEN RAIDER',items:rollEnemyLoot(e)};
+    e.ragdoll.interaction=addInteraction(trigger,'SEARCH BODY',()=>openLoot(loot),2.5,[corpsePos.x,corpsePos.y+.55,corpsePos.z]);
+    toast(physics?'HOSTILE DOWN // STABLE RAGDOLL':'HOSTILE DOWN');
+  }
+  function ragdollStep(dt){
+    for(const e of ragdolls){
+      const r=e.ragdoll;
+      if(!r||!e.rig||isDisposedSafe(e.root))continue;
+      r.t+=dt;
+      if(r.physics){
+        // Havok may produce a one-frame solver spike when a skeleton is handed from
+        // animation to physics. Clamp that spike and heavily damp rotation while the
+        // body settles. This keeps deaths weighty without freezing the corpse in place.
+        const early=r.t<r.stabilizeFor,settling=r.t<r.settleFor;
+        const maxLin=early?1.65:settling?3.0:4.5;
+        const maxAng=early?2.1:settling?3.0:3.8;
+        for(const a of ragdollAggregates(e)){
+          try{a.body?.setLinearDamping?.(early?.72:settling?.62:.56);a.body?.setAngularDamping?.(early?.92:settling?.88:.84)}catch{}
+          capBodyVelocity(a.body,maxLin,maxAng);
+        }
+        const p=physicsRagdollPosition(e);
+        if(p){
+          if(r.trigger&&!isDisposedSafe(r.trigger))r.trigger.position.set(p.x,p.y+.55,p.z);
+          if(r.interaction){r.interaction.point.set(p.x,p.y+.55,p.z);r.interaction.bounds=null}
+        }
+        continue;
+      }
+      if(isDisposedSafe(r.collider))continue;
+      r.vel.y-=12.5*dt;
+      const before=r.collider.position.clone(),requested=r.vel.scale(dt);
+      try{r.collider.setEnabled(true);r.collider.moveWithCollisions(requested)}catch{r.collider.position.addInPlace(requested)}
+      const moved=r.collider.position.subtract(before);
+      if(requested.y<-.001&&Math.abs(moved.y-requested.y)>.008){r.grounded=true;r.vel.y=Math.max(0,-r.vel.y*.04);r.vel.x*=Math.pow(.08,dt);r.vel.z*=Math.pow(.08,dt)}else r.grounded=false;
+      if(Math.abs(moved.x-requested.x)>.02)r.vel.x*=-.12;
+      if(Math.abs(moved.z-requested.z)>.02)r.vel.z*=-.12;
+      e.root.position.set(r.collider.position.x,r.collider.position.y-r.rootOffsetY,r.collider.position.z);
+      r.angVel.scaleInPlace(Math.pow(r.grounded?.05:.28,dt));
+      e.root.rotation.x+=r.angVel.x*dt;e.root.rotation.y+=r.angVel.y*dt;e.root.rotation.z+=r.angVel.z*dt;
+      const settle=clamp(r.t/1.15,0,1),impact=Math.exp(-r.t*3.2),flop=Math.sin(r.t*6+r.limbSeed)*impact*.35;
+      const side=r.fallSide,tw=r.twist,b=n=>boneByName(e.rig,n);
+      setBoneEuler(b('Spine'),tw*.12*settle,0,side*.05*settle);setBoneEuler(b('Chest'),tw*.14*settle,0,side*.10*settle);setBoneEuler(b('Neck'),-.08*settle,tw*.08,0);setBoneEuler(b('Head'),.12*settle,tw*.10,side*.08);
+      setBoneEuler(b('UpperArm_L'),-.48*settle+flop*.18,tw*.10,-.62*side*settle);setBoneEuler(b('UpperArm_R'),-.42*settle-flop*.16,-tw*.08,.56*side*settle);setBoneEuler(b('LowerArm_L'),-.58*settle+flop*.10,0,.12*flop);setBoneEuler(b('LowerArm_R'),-.54*settle-flop*.10,0,-.12*flop);
+      setBoneEuler(b('UpperLeg_L'),.30*settle+flop*.08,0,.14*side);setBoneEuler(b('UpperLeg_R'),-.26*settle-flop*.08,0,-.14*side);setBoneEuler(b('LowerLeg_L'),-.40*settle+Math.max(0,flop)*.08,0,0);setBoneEuler(b('LowerLeg_R'),-.34*settle+Math.max(0,-flop)*.08,0,0);
+      if(r.trigger&&!isDisposedSafe(r.trigger))r.trigger.position.set(e.root.position.x,e.root.position.y+1,e.root.position.z);
+      if(r.interaction){r.interaction.point.set(e.root.position.x,e.root.position.y+1,e.root.position.z);r.interaction.bounds=null}
+      if(r.t>2.5&&r.grounded){r.vel.x*=.5;r.vel.z*=.5;r.angVel.scaleInPlace(.35)}
+    }
+  }
   function rollEnemyLoot(e){const items=[];if(Math.random()<.88)items.push(e.weapon);const w=WEAPONS[e.weapon];if(w&&Math.random()<.92)items.push(w.ammo);const table=e.lootProfile==='military'?'military':'civilian';const n=Math.floor(rand(1,4));for(let i=0;i<n;i++)items.push(choose(LOOT_TABLES[table]));if(e.tier>=3&&Math.random()<.35)items.push(choose(['military_radio','keycard','medkit']));return items}
 
   // ---------- LOOT ----------
@@ -501,12 +654,12 @@
   function baseScene(fog='#0a0e0d'){const s=new BABYLON.Scene(engine);s.collisionsEnabled=true;s.gravity=BABYLON.Vector3.Zero();if(havokInterface&&BABYLON.HavokPlugin){try{const plugin=new BABYLON.HavokPlugin(true,havokInterface);s.enablePhysics(new BABYLON.Vector3(0,-9.81,0),plugin);s.metadata={...(s.metadata||{}),deadhaulPhysics:true,physicsPlugin:plugin}}catch(err){console.warn('Scene physics initialization failed',err)}}s.clearColor=BABYLON.Color4.FromHexString(fog+'ff');s.fogMode=BABYLON.Scene.FOGMODE_EXP2;s.fogDensity=.009;s.fogColor=BABYLON.Color3.FromHexString(fog);s.onBeforeRenderObservable.add(()=>{controllerStep();updateInteraction();const dt=Math.min(engine.getDeltaTime()/1000,.033);bulletStep(dt);bloodStep(dt);enemyStep(dt);ragdollStep(dt);grenadeStep(dt);weaponAutoStep();updateCompass()});return s}
   function resetRaidState(){fieldItems=[];fieldWeight=0;hauledHeavy=null;health=100;stamina=100;playerDead=false;sprintExhausted=false;sprintReleaseSeen=false;actualSprinting=false;locomotionMoveBlend=0;locomotionSprintBlend=0;locomotionLean=0;bullets=[];enemies=[];ragdolls=[];bloodParticles=[];fireHeld=false;aimHeld=false;reloading=false;weaponKick=0;flashlightOn=false;grenades=[];actionBusy=false;activeFpAction=null;clearActionProp();resetMixamoWeaponFollowRef();updateVitals();initWeapons()}
   function disposeCurrentScene(){weaponEditorOpen=false;customizationOpen=false;$('customizationPanel')?.classList.add('hidden');$('weaponAlignEditor')?.classList.add('hidden');disposeFirstPersonIK();for(const e of enemies){try{e?.physicsRagdoll?.dispose?.()}catch(err){console.warn('DEADHAUL ragdoll dispose warning',err)}}nearest=null;interactions=[];currentCamera=null;playerBody=null;viewWeapon=null;fpRig=null;playerWorldRig=null;playerFpBodyRig=null;playerWorldWeapon=null;playerGearRoots=[];playerFpGearRoots=[];safehouseDisplayRoots=[];safehouseCustomizationRoots=[];safehouseSceneRefs=null;clearPlayerHitboxes();playerShadowGenerator=null;flashlight=null;bullets=[];enemies=[];ragdolls=[];grenades=[];activeFpAction=null;actionBusy=false;clearActionProp();if(currentScene&&!isDisposedSafe(currentScene))currentScene.dispose();currentScene=null}
-  async function buildBunker(){stopTimer();raidStart=0;sceneMode='bunker';updateEquipmentPresentation();interactions=[];nearest=null;health=100;stamina=100;playerDead=false;sprintExhausted=false;sprintReleaseSeen=false;actualSprinting=false;fieldItems=[];fieldWeight=0;hauledHeavy=null;updateVitals();$('raidTimer').classList.add('hidden');$('weaponHud').classList.add('hidden');$('raidInventoryMini').classList.add('hidden');$('locationLabel').textContent='BUNKER // NODE 17 // BUILD 2.6.1';$('objective').innerHTML='<span>SAFEHOUSE</span><b>Manage your stash, prepare a loadout, customize NODE 17, or deploy to the surface.</b>';const scene=baseScene('#080b0a');currentScene=scene;const concrete=mat(scene,'bunkerConcrete','#242a28'),dark=mat(scene,'bunkerDark','#101412'),floorMat=mat(scene,'bunkerFloor','#202624'),metal=mat(scene,'terminalMetal','#303a35'),screen=mat(scene,'terminalScreen','#1d392c','#244e37');box(scene,'floor',[22,.35,27],[0,-.18,0],floorMat);box(scene,'ceiling',[22,.25,27],[0,4.8,0],dark,true);box(scene,'rear',[22,5,.35],[0,2.5,-13.5],concrete);box(scene,'left',[.35,5,27],[-11,2.5,0],concrete);box(scene,'right',[.35,5,27],[11,2.5,0],concrete);box(scene,'frontL',[8.1,5,.35],[-6.95,2.5,13.5],concrete);box(scene,'frontR',[8.1,5,.35],[6.95,2.5,13.5],concrete);setupCamera(scene,[0,1.75,-7],[0,1.6,7]);const hemi=new BABYLON.HemisphericLight('ambient',new BABYLON.Vector3(0,1,0),scene);hemi.intensity=playerData.state?.has_generator?.5:.23;const p=new BABYLON.PointLight('bunkerLamp',new BABYLON.Vector3(0,4,-1),scene);p.intensity=playerData.state?.has_generator?1.5:.45;p.diffuse=new BABYLON.Color3(.75,.9,.65);p.range=24;safehouseSceneRefs={concrete,dark,floor:floorMat,hemi,lamp:p};applySafehouseVisualConfig();
+  async function buildBunker(){stopTimer();raidStart=0;sceneMode='bunker';updateEquipmentPresentation();interactions=[];nearest=null;health=100;stamina=100;playerDead=false;sprintExhausted=false;sprintReleaseSeen=false;actualSprinting=false;fieldItems=[];fieldWeight=0;hauledHeavy=null;updateVitals();$('raidTimer').classList.add('hidden');$('weaponHud').classList.add('hidden');$('raidInventoryMini').classList.add('hidden');$('locationLabel').textContent='BUNKER // NODE 17 // BUILD 2.6.2';$('objective').innerHTML='<span>SAFEHOUSE</span><b>Manage your stash, prepare a loadout, customize NODE 17, or deploy to the surface.</b>';const scene=baseScene('#080b0a');currentScene=scene;const concrete=mat(scene,'bunkerConcrete','#242a28'),dark=mat(scene,'bunkerDark','#101412'),floorMat=mat(scene,'bunkerFloor','#202624'),metal=mat(scene,'terminalMetal','#303a35'),screen=mat(scene,'terminalScreen','#1d392c','#244e37');box(scene,'floor',[22,.35,27],[0,-.18,0],floorMat);box(scene,'ceiling',[22,.25,27],[0,4.8,0],dark,true);box(scene,'rear',[22,5,.35],[0,2.5,-13.5],concrete);box(scene,'left',[.35,5,27],[-11,2.5,0],concrete);box(scene,'right',[.35,5,27],[11,2.5,0],concrete);box(scene,'frontL',[8.1,5,.35],[-6.95,2.5,13.5],concrete);box(scene,'frontR',[8.1,5,.35],[6.95,2.5,13.5],concrete);setupCamera(scene,[0,1.75,-7],[0,1.6,7]);const hemi=new BABYLON.HemisphericLight('ambient',new BABYLON.Vector3(0,1,0),scene);hemi.intensity=playerData.state?.has_generator?.5:.23;const p=new BABYLON.PointLight('bunkerLamp',new BABYLON.Vector3(0,4,-1),scene);p.intensity=playerData.state?.has_generator?1.5:.45;p.diffuse=new BABYLON.Color3(.75,.9,.65);p.range=24;safehouseSceneRefs={concrete,dark,floor:floorMat,hemi,lamp:p};applySafehouseVisualConfig();
     const jobs=[];for(const z of [-9,-3,3,9]){jobs.push(loadModel(scene,'bunker_wall',[-10.8,0,z],{rotationY:Math.PI/2,collision:false}),loadModel(scene,'bunker_wall',[10.8,0,z],{rotationY:-Math.PI/2,collision:false}))}for(const x of [-6,0,6])jobs.push(loadModel(scene,'bunker_wall',[x,0,-13.3],{collision:false}));jobs.push(loadModel(scene,'blast_door',[0,0,13.15],{rotationY:Math.PI}),loadModel(scene,'workbench',[-6,0,-6],{rotationY:Math.PI/2}),loadModel(scene,'metal_shelf',[7,0,-7.5],{rotationY:-Math.PI/2}),loadModel(scene,'metal_shelf',[7,0,-3.8],{rotationY:-Math.PI/2}),loadModel(scene,'storage_crate',[5,0,5],{}),loadModel(scene,'storage_crate',[6.8,0,5],{}),loadModel(scene,'locker_bank',[-8.4,0,3.5],{rotationY:Math.PI/2}),loadModel(scene,'ceiling_light',[0,4.45,-5],{collision:false}),loadModel(scene,'ceiling_light',[0,4.45,3],{collision:false}),loadModel(scene,'ceiling_light',[0,4.45,10],{collision:false}));if(playerData.state?.has_generator)jobs.push(loadModel(scene,'portable_generator',[-5.2,0,4.5],{rotationY:Math.PI/2}));await Promise.allSettled(jobs);
     // deployment terminal
     box(scene,'terminalDesk',[2.7,1.05,.7],[-4.6,.52,8.8],metal,true);const mon=await loadModel(scene,'monitor',[-4.6,1.05,8.65],{rotationY:Math.PI,collision:false});const terminalScreen=box(scene,'terminalGlow',[.58,.34,.02],[-4.6,1.86,8.28],screen,false,false);const terminalTrigger=interactionTrigger(scene,'terminal',[-4.6,1.4,8.2],[3,2.7,2.5]);addInteraction(terminalTrigger,'USE DEPLOYMENT TERMINAL',openMapPanel,3.0,[-4.6,1.4,8.2]);const doorTrigger=interactionTrigger(scene,'doorSelect',[0,1.5,11.6],[5.5,3,2.4]);addInteraction(doorTrigger,'SELECT RAID',openMapPanel,3.0,[0,1.5,11.6]);const stashTrigger=interactionTrigger(scene,'stashAccess',[6.3,1.4,-5.7],[3.2,3.0,5.2]);addInteraction(stashTrigger,'ACCESS STASH / DISPLAY',openStashPanel,3.2,[6.3,1.4,-5.7]);const workTrigger=interactionTrigger(scene,'safehouseConfig',[-6,1.2,-6],[3.2,2.5,3.2]);addInteraction(workTrigger,'CUSTOMIZE BUNKER',openCustomizationPanel,3.0,[-6,1.2,-6]);await rebuildSafehouseDecor(scene);await rebuildSafehouseDisplays(scene);await loadPlayerWorldRig(scene,true);syncPlayerCharacter(.016,false,false);return scene}
 
-  async function startRaid(mapId=selectedMapId){if(transitionInProgress)return;const preparedForRaid=[...preparedBag()];const prepWeight=preparedForRaid.reduce((n,id)=>n+(C[id]?.weight||0),0);if(prepWeight>bagCapacity()){toast('PREPARED BACKPACK OVERWEIGHT');return}transitionInProgress=true;selectedMapId=mapId;closeAllGameplayPanels();$('mapPanel').classList.add('hidden');mapOpen=false;setDeploymentLoading(true,'PREPARING '+MAPS[mapId].name.toUpperCase());const old=currentScene;let scene=null;try{equipment._bag=[];await A.saveLoadout?.(equipment);resetRaidState();fieldItems=[...preparedForRaid];recalcWeight();sceneMode='raid';updateEquipmentPresentation();const map=MAPS[mapId];scene=baseScene(map.fog);currentScene=scene;scene.fogDensity=mapId==='clinic'?.007:.008;const ground=mat(scene,'ground_'+mapId,mapId==='checkpoint'?'#39372e':'#343832'),road=mat(scene,'road','#222725');const terrain=box(scene,'terrain',[150,.35,150],[0,-.18,0],ground,true,true);terrain.receiveShadows=true;box(scene,'roadMain',[14,.06,135],[0,.01,0],road,false,true);for(const p of [[-74,2,0],[74,2,0],[0,2,-74],[0,2,74]])collisionBox(scene,'boundary',[p[0]===0?150:.4,4,p[2]===0?150:.4],p);setupCamera(scene,map.spawn,[map.spawn[0],1.55,map.spawn[2]+18]);const sky=new BABYLON.HemisphericLight('sky',new BABYLON.Vector3(.2,1,.1),scene);sky.intensity=.72;sky.diffuse=new BABYLON.Color3(.62,.68,.63);const sun=new BABYLON.DirectionalLight('sun',new BABYLON.Vector3(-.4,-1,.28),scene);sun.intensity=.32;sun.diffuse=new BABYLON.Color3(.8,.72,.62);try{playerShadowGenerator=new BABYLON.ShadowGenerator(1024,sun);playerShadowGenerator.useBlurExponentialShadowMap=true;playerShadowGenerator.blurKernel=16}catch{playerShadowGenerator=null}await Promise.all([populateMap(scene,mapId),loadPlayerWorldRig(scene,true),loadFirstPersonRig(scene)]);createExtraction(scene,map.extract,map.name);if(old&&old!==scene&&!isDisposedSafe(old))old.dispose();$('locationLabel').textContent=`SURFACE // ${map.name.toUpperCase()} // BUILD 2.6.1`;$('objective').innerHTML='<span>OBJECTIVE</span><b>Search useful locations, survive contact, and extract with what you can carry.</b>';$('raidTimer').classList.remove('hidden');$('raidInventoryMini').classList.remove('hidden');raidStart=Date.now();startTimer();await loadViewWeapon();const enteringWeapon=getActiveWeapon();if(enteringWeapon)startFpAction('equip',.5,enteringWeapon.id);setDeploymentLoading(false);transitionInProgress=false;canvas.focus();canvas.requestPointerLock?.();toast('SURFACE LINK ESTABLISHED')}catch(err){console.error('Deployment failed',err);transitionInProgress=false;setDeploymentLoading(false);if(scene&&scene!==old&&!isDisposedSafe(scene))scene.dispose();if(old&&!isDisposedSafe(old)){currentScene=old;currentCamera=old.activeCamera;playerBody=old.getMeshByName?.('playerBody');sceneMode='bunker'}if(preparedForRaid.length){equipment._bag=[...preparedForRaid];try{await A.saveLoadout?.(equipment)}catch{}}toast('DEPLOYMENT FAILED // '+(err.message||err),3200)}}
+  async function startRaid(mapId=selectedMapId){if(transitionInProgress)return;const preparedForRaid=[...preparedBag()];const prepWeight=preparedForRaid.reduce((n,id)=>n+(C[id]?.weight||0),0);if(prepWeight>bagCapacity()){toast('PREPARED BACKPACK OVERWEIGHT');return}transitionInProgress=true;selectedMapId=mapId;closeAllGameplayPanels();$('mapPanel').classList.add('hidden');mapOpen=false;setDeploymentLoading(true,'PREPARING '+MAPS[mapId].name.toUpperCase());const old=currentScene;let scene=null;try{equipment._bag=[];await A.saveLoadout?.(equipment);resetRaidState();fieldItems=[...preparedForRaid];recalcWeight();sceneMode='raid';updateEquipmentPresentation();const map=MAPS[mapId];scene=baseScene(map.fog);currentScene=scene;scene.fogDensity=mapId==='clinic'?.007:.008;const ground=mat(scene,'ground_'+mapId,mapId==='checkpoint'?'#39372e':'#343832'),road=mat(scene,'road','#222725');const terrain=box(scene,'terrain',[150,.35,150],[0,-.18,0],ground,true,true);terrain.receiveShadows=true;box(scene,'roadMain',[14,.06,135],[0,.01,0],road,false,true);for(const p of [[-74,2,0],[74,2,0],[0,2,-74],[0,2,74]])collisionBox(scene,'boundary',[p[0]===0?150:.4,4,p[2]===0?150:.4],p);setupCamera(scene,map.spawn,[map.spawn[0],1.55,map.spawn[2]+18]);const sky=new BABYLON.HemisphericLight('sky',new BABYLON.Vector3(.2,1,.1),scene);sky.intensity=.72;sky.diffuse=new BABYLON.Color3(.62,.68,.63);const sun=new BABYLON.DirectionalLight('sun',new BABYLON.Vector3(-.4,-1,.28),scene);sun.intensity=.32;sun.diffuse=new BABYLON.Color3(.8,.72,.62);try{playerShadowGenerator=new BABYLON.ShadowGenerator(1024,sun);playerShadowGenerator.useBlurExponentialShadowMap=true;playerShadowGenerator.blurKernel=16}catch{playerShadowGenerator=null}await Promise.all([populateMap(scene,mapId),loadPlayerWorldRig(scene,true),loadFirstPersonRig(scene)]);createExtraction(scene,map.extract,map.name);if(old&&old!==scene&&!isDisposedSafe(old))old.dispose();$('locationLabel').textContent=`SURFACE // ${map.name.toUpperCase()} // BUILD 2.6.2`;$('objective').innerHTML='<span>OBJECTIVE</span><b>Search useful locations, survive contact, and extract with what you can carry.</b>';$('raidTimer').classList.remove('hidden');$('raidInventoryMini').classList.remove('hidden');raidStart=Date.now();startTimer();await loadViewWeapon();const enteringWeapon=getActiveWeapon();if(enteringWeapon)startFpAction('equip',.5,enteringWeapon.id);setDeploymentLoading(false);transitionInProgress=false;canvas.focus();canvas.requestPointerLock?.();toast('SURFACE LINK ESTABLISHED')}catch(err){console.error('Deployment failed',err);transitionInProgress=false;setDeploymentLoading(false);if(scene&&scene!==old&&!isDisposedSafe(scene))scene.dispose();if(old&&!isDisposedSafe(old)){currentScene=old;currentCamera=old.activeCamera;playerBody=old.getMeshByName?.('playerBody');sceneMode='bunker'}if(preparedForRaid.length){equipment._bag=[...preparedForRaid];try{await A.saveLoadout?.(equipment)}catch{}}toast('DEPLOYMENT FAILED // '+(err.message||err),3200)}}
   function setDeploymentLoading(show,msg='PREPARING RAID'){$('deploymentStatus').textContent=msg;$('deploymentOverlay').classList.toggle('hidden',!show)}
   function createExtraction(scene,pos,zone){const green=mat(scene,'extract','#31472d','#334d26');const ex=BABYLON.MeshBuilder.CreateCylinder('extraction',{diameter:5.5,height:.10,tessellation:32},scene);ex.position=new BABYLON.Vector3(...pos);ex.material=green;ex.checkCollisions=false;const flare=new BABYLON.PointLight('flare',new BABYLON.Vector3(pos[0],1.2,pos[2]),scene);flare.diffuse=new BABYLON.Color3(.47,.9,.34);flare.intensity=2.4;flare.range=14;addInteraction(ex,'EXTRACT',()=>completeExtraction(zone),4.5,[pos[0],1.1,pos[2]])}
 

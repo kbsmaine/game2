@@ -1,6 +1,6 @@
-# DEADHAUL Build 2.6.1 — Physics Ragdolls + Split Safehouse UI
+# DEADHAUL Build 2.6.2 — Stable Ragdolls + Split Safehouse UI
 
-Build 2.6.1 keeps the 2.6.0 persistence/inventory pass and separates the safehouse into two real gameplay stations while replacing the fake enemy death flop with Babylon Physics V2/Havok ragdolls.
+Build 2.6.2 keeps the split safehouse/persistent inventory systems and retunes Babylon Physics V2/Havok enemy ragdolls for grounded, stable deaths instead of explosive flopping.
 
 ## Safehouse stations
 
@@ -47,6 +47,6 @@ If Havok cannot initialize, the older procedural fallback remains only as a fail
 
 Run `PLAY-TEST.bat` or `START-DEMO.bat`.
 
-Local port: **8805**
+Local port: **8806**
 
-Confirm the HUD says **BUILD 2.6.1**.
+Confirm the HUD says **BUILD 2.6.2**.
