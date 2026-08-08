@@ -1,0 +1,10 @@
+DEADHAUL Build 2.5.0 — Ch15 Authored Mixamo Locomotion
+
+- Imported seven user-provided Mixamo FBX animation clips.
+- Embedded their animation curves into player_ch15.glb, player_ch15_fp_lower.glb, and player_ch15_fp_arms.glb.
+- Ch15 world body now uses authored idle/walk/rifle idle/rifle aim/rifle walk/rifle run locomotion.
+- First-person lower body uses the same authored locomotion.
+- First-person arms keep DEADHAUL IK so hands remain locked to game weapon models.
+- Mixamo root forward travel stripped; controller remains authoritative.
+- Rifle Run High Ready included as an optional sprint state.
+- Local test port 8794.
