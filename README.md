@@ -1,67 +1,52 @@
-# DEADHAUL Build 2.6.0 — Safehouse / Stash / Body Pass
+# DEADHAUL Build 2.6.1 — Physics Ragdolls + Split Safehouse UI
 
-Build 2.6.0 turns extracted loot into usable progression instead of a throwaway summary.
+Build 2.6.1 keeps the 2.6.0 persistence/inventory pass and separates the safehouse into two real gameplay stations while replacing the fake enemy death flop with Babylon Physics V2/Havok ragdolls.
 
-## New in this build
+## Safehouse stations
 
-- Persistent safehouse stash after extraction.
-- In-bunker stash/loadout panel. Press **TAB** in the safehouse or interact with the stash shelves.
-- Equip and unequip helmets, armor, rigs, backpacks, primary weapons and sidearms.
-- Prepare a raid backpack from the stash before deploying.
-- Drop backpack items during raids and pick them back up from the world.
-- Item thumbnails/icons throughout inventory and looting UI.
-- Safehouse display slots for recovered items.
-- Safehouse customization: theme, lighting and display wall controls.
-- First-person body/chest awareness improvements.
-- Downward look is clamped to a more normal shooter range.
-- UI click/confirm sounds.
-- Concrete/metal footstep sounds.
-- Improved ragdoll-style enemy death physics.
+### Quartermaster — Stash & Display
+Interact with the storage shelves on the right side of NODE 17, or press TAB while in the bunker. This UI handles:
 
-## Controls
+- persistent recovered raid inventory
+- item thumbnails
+- equip / unequip gear
+- primary and secondary weapon loadout
+- prepared next-raid backpack
+- display / remove display for recovered loot
+- automatic best-loot display selection
 
-- **WASD** move
-- **Shift** sprint
-- **Space** jump
-- **LMB** fire
-- **RMB** aim
-- **R** reload
-- **E** interact/search/open container
-- **TAB** inventory in raid / safehouse stash in bunker
-- **G** grenade
-- **T** flashlight
-- **F6** weapon alignment editor
-- **ESC** settings
+Items successfully extracted from raids remain in the stash and can be equipped, packed, displayed, or moved later.
 
-## Safehouse flow
+### Workbench — Bunker Customization
+Interact with the workbench on the left side of NODE 17. This opens a completely separate UI for the bunker itself:
 
-1. Extract from a raid.
-2. Recovered items are committed to your safehouse stash.
-3. Return to the bunker.
-4. Press **TAB** or use the stash shelves.
-5. Equip gear, unequip gear, move items into your prepared raid backpack, or display favorite finds in the safehouse.
-6. Deploy again with the prepared backpack.
+- wall finish
+- floor finish
+- utility light color
+- light intensity
+- furnishing preset: Survival / Workshop / Armory / Minimal
+- clutter density: Sparse / Normal / Dense
 
-## Local testing
+The choices are persisted locally per survivor and update the visible bunker immediately. Stash/display management is not mixed into this screen.
 
-Run:
+## Real enemy physics ragdolls
 
-```text
-START-DEMO.bat
-```
+Ch18, Ch35 and SWAT enemies now prepare Babylon `Ragdoll` bodies while alive. On death, their authored animation stops and the real skinned skeleton is handed to Havok Physics V2:
 
-or jump straight into the game with:
+- physics boxes are attached to hips, spine, chest, head, upper/lower arms and upper/lower legs
+- joints connect the bodies through the skeleton hierarchy
+- the death shot adds physical linear/angular impulse
+- the actual character mesh follows the physics-driven bones
+- the attached weapon stays on the animated/ragdolled hand
+- corpse search interaction follows the ragdoll's physical root
+- raid terrain, walls and collision proxies are registered as static Havok bodies so corpses collide with the environment
 
-```text
-PLAY-TEST.bat
-```
+If Havok cannot initialize, the older procedural fallback remains only as a failure-safe.
 
-Local port: **8804**
+## Testing
 
-Confirm the HUD says **BUILD 2.6.0**.
+Run `PLAY-TEST.bat` or `START-DEMO.bat`.
 
-## Supabase note
+Local port: **8805**
 
-If you already connected real Supabase credentials, keep your existing `config.js` when overwriting a previous GitHub build.
-
-Build 2.6.0 adds inventory insert/delete RLS policies in `sql/schema.sql` so connected accounts can move stash items into equipment and prepared bags.
+Confirm the HUD says **BUILD 2.6.1**.

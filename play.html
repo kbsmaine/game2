@@ -7,13 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/game.css?v=2.6.0" />
+  <link rel="stylesheet" href="css/game.css?v=2.6.1" />
 </head>
 <body>
   <canvas id="renderCanvas" tabindex="0"></canvas>
   <div id="gameUi">
     <div class="top-hud">
-      <div class="brandHud"><b>DEADHAUL <small>BUILD 2.6.0</small></b><span id="locationLabel">BUNKER // NODE 17</span></div>
+      <div class="brandHud"><b>DEADHAUL <small>BUILD 2.6.1</small></b><span id="locationLabel">BUNKER // NODE 17</span></div>
       <div class="raid-center"><div id="raidTimer" class="raid-timer hidden">00:00</div><div id="compass">N</div></div>
       <div class="hud-actions"><button id="inventoryButton" type="button">TAB // INVENTORY</button><button id="alignButton" type="button">ALIGN [F6]</button><button id="settingsButton" type="button">SETTINGS</button><a href="command.html">COMMAND</a></div>
     </div>
@@ -44,7 +44,7 @@
       <div class="start-card">
         <span>// GAME CLIENT</span>
         <h1>NODE 17</h1>
-        <p><b>BUILD 2.6.0 — SAFEHOUSE / PERSISTENT STASH</b><br>WASD move · SHIFT sprint · SPACE jump · Mouse aim · LMB fire · RMB aim · R reload · E interact · TAB inventory · G grenade · T flashlight · ESC settings</p>
+        <p><b>BUILD 2.6.1 — SAFEHOUSE / PERSISTENT STASH</b><br>WASD move · SHIFT sprint · SPACE jump · Mouse aim · LMB fire · RMB aim · R reload · E interact · TAB inventory · G grenade · T flashlight · ESC settings</p>
         <button id="enterGame">ENTER BUNKER</button>
       </div>
     </div>
@@ -93,7 +93,7 @@
 
     <div id="stashPanel" class="fullscreen-panel hidden">
       <div class="panel-shell stash-shell">
-        <div class="panel-head"><div><span>// NODE 17 SAFEHOUSE</span><h2>STASH & LOADOUT</h2></div><button class="panel-close" data-close="stashPanel">CLOSE [TAB]</button></div>
+        <div class="panel-head"><div><span>// NODE 17 QUARTERMASTER</span><h2>STASH & DISPLAY</h2></div><button class="panel-close" data-close="stashPanel">CLOSE [TAB]</button></div>
         <div class="stash-layout">
           <section class="stash-loadout-panel">
             <div class="stash-section-title"><span>READY RACK</span><b>EQUIPPED GEAR</b></div>
@@ -103,17 +103,41 @@
             <small class="stash-note">Items packed here are committed when you deploy. If you die or drop/use them, they are gone.</small>
           </section>
           <section class="stash-storage-panel">
-            <div class="bag-head"><div><span>RECOVERED INVENTORY</span><b id="stashCount">0 ITEMS</b></div><small>Recovered raid loot remains here after extraction.</small></div>
+            <div class="bag-head"><div><span>RECOVERED INVENTORY</span><b id="stashCount">0 ITEMS</b></div><small>Everything you successfully extract with remains available here.</small></div>
             <div id="stashGridGame" class="bag-grid stash-grid-game"></div>
           </section>
-          <section class="safehouse-control-panel">
-            <div class="stash-section-title"><span>DISPLAY WALL</span><b>SAFEHOUSE CUSTOMIZATION</b></div>
-            <div class="safehouse-setting"><label>WALL FINISH</label><select id="safehouseTheme"><option value="concrete">RAW CONCRETE</option><option value="olive">FIELD OLIVE</option><option value="charcoal">CHARCOAL</option></select></div>
-            <div class="safehouse-setting"><label>LIGHT LEVEL</label><input id="safehouseLight" type="range" min="0.25" max="1.6" step="0.05" value="0.8"><output id="safehouseLightValue">0.80</output></div>
+          <section class="stash-display-panel">
+            <div class="stash-section-title"><span>TROPHY / DISPLAY STORAGE</span><b>PHYSICAL DISPLAY</b><small>These items remain in your stash; this only changes what is shown in the bunker.</small></div>
             <button id="autoDisplayLoot" class="safehouse-action" type="button">AUTO DISPLAY BEST LOOT</button>
             <button id="clearDisplayLoot" class="safehouse-action subtle" type="button">CLEAR DISPLAY</button>
-            <div class="display-help">Use <b>DISPLAY</b> on stash items to pin up to 8 recovered items on the physical bunker shelf.</div>
+            <div class="display-help">Use <b>DISPLAY</b> on any recovered stash item to pin up to 8 items to the physical safehouse display shelves.</div>
             <div id="displaySlots" class="display-slots"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="customizationPanel" class="fullscreen-panel hidden">
+      <div class="panel-shell customization-shell">
+        <div class="panel-head"><div><span>// NODE 17 WORKBENCH</span><h2>BUNKER CUSTOMIZATION</h2></div><button class="panel-close" data-close="customizationPanel">CLOSE ×</button></div>
+        <div class="customization-layout">
+          <section class="customization-preview-card">
+            <span class="custom-kicker">SAFEHOUSE PROFILE</span>
+            <h3 id="safehouseProfileName">NODE 17 // SURVIVAL</h3>
+            <p>Customize the bunker itself here. Your stash, equipped gear and displayed raid loot are managed separately at the Quartermaster station.</p>
+            <div class="customization-readout"><span>WALLS</span><b id="customWallReadout">RAW CONCRETE</b></div>
+            <div class="customization-readout"><span>FLOOR</span><b id="customFloorReadout">SEALED CONCRETE</b></div>
+            <div class="customization-readout"><span>LIGHTING</span><b id="customLightReadout">UTILITY WHITE</b></div>
+            <div class="customization-readout"><span>FURNISHING</span><b id="customDecorReadout">SURVIVAL</b></div>
+          </section>
+          <section class="customization-controls">
+            <div class="safehouse-setting"><label>WALL FINISH</label><select id="safehouseTheme"><option value="concrete">RAW CONCRETE</option><option value="olive">FIELD OLIVE</option><option value="charcoal">CHARCOAL</option><option value="rust">RUSTED INDUSTRIAL</option></select></div>
+            <div class="safehouse-setting"><label>FLOOR FINISH</label><select id="safehouseFloor"><option value="sealed">SEALED CONCRETE</option><option value="dark">DARK EPOXY</option><option value="olive">FIELD DECK</option><option value="rust">WORN STEEL</option></select></div>
+            <div class="safehouse-setting"><label>UTILITY LIGHT COLOR</label><select id="safehouseLampColor"><option value="white">UTILITY WHITE</option><option value="warm">WARM TUNGSTEN</option><option value="green">FIELD GREEN</option><option value="red">RED NIGHT LIGHT</option></select></div>
+            <div class="safehouse-setting"><label>LIGHT LEVEL</label><input id="safehouseLight" type="range" min="0.25" max="1.6" step="0.05" value="0.8"><output id="safehouseLightValue">0.80</output></div>
+            <div class="safehouse-setting"><label>FURNISHING PRESET</label><select id="safehouseDecor"><option value="survival">SURVIVAL CACHE</option><option value="workshop">WORKSHOP</option><option value="armory">ARMORY</option><option value="minimal">MINIMAL</option></select></div>
+            <div class="safehouse-setting"><label>CLUTTER DENSITY</label><select id="safehouseClutter"><option value="sparse">SPARSE</option><option value="normal">NORMAL</option><option value="dense">DENSE</option></select></div>
+            <button id="safehouseReset" class="safehouse-action subtle" type="button">RESET BUNKER STYLE</button>
           </section>
         </div>
       </div>
@@ -181,8 +205,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdn.babylonjs.com/havok/HavokPhysics_umd.js"></script>
   <script src="config.js"></script>
-  <script src="js/auth.js?v=2.6.0"></script>
-  <script src="js/game.js?v=2.6.0"></script>
+  <script src="js/auth.js?v=2.6.1"></script>
+  <script src="js/game.js?v=2.6.1"></script>
 </body>
 </html>
