@@ -1,0 +1,12 @@
+DEADHAUL BUILD 2.6.4
+
+SHOOTER-STYLE CONTROLLED ENEMY DEATHS
+- Disabled instant Havok skeletal ragdoll activation on enemy death.
+- Enemies now preserve the exact authored Mixamo pose at impact and collapse from it.
+- No death impulse, launch velocity, random spin, or joint solver explosion.
+- Short knee buckle followed by a grounded forward/back collapse and tiny side variation.
+- Corpse pose stops updating after ~0.92s, so later deaths cannot affect earlier corpses.
+- SEARCH BODY trigger follows the fallen torso and remains usable.
+- Existing stash, safehouse customization, inventory, animations, sounds, and combat systems retained.
+
+Local test port: 8808

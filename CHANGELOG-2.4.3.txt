@@ -1,0 +1,10 @@
+DEADHAUL Build 2.4.3 - Ch15 first-person hold fix
+
+- Fixed Ch15 first-person root transform being overwritten every frame by the generic fp_arms base transform.
+- Regenerated Ch15 first-person arms from skin-weighted arm/hand/finger triangles only.
+- Regenerated first-person lower body from pelvis/leg/foot skin weights only.
+- Added Mixamo two-bone IK grip targets so Ch15 hands bend toward the weapon instead of remaining in the T-pose.
+- Corrected attachToBone calls to use the actual skinned mesh instead of the imported scene root.
+- Weapon-specific support-hand targets for pistols, SMGs, rifles, shotguns and bolt rifles.
+- IK targets blend for ADS, sprint, reload, grenade and medical actions.
+- Local test port 8792.

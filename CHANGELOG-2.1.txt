@@ -1,0 +1,43 @@
+DEADHAUL BUILD 2.1.1 — CHARACTER + WEAPON MEDIA UPDATE
+
+Baseline:
+- Built on the stable Build 2.0 gameplay / Build 1.1 controller-transition foundation.
+
+Character system:
+- Added player_01.glb, player_02.glb, player_03.glb as skinned world-character rigs.
+- Added fp_arms.glb as a separate first-person skinned arms rig.
+- Added raider_01.glb, raider_02.glb, raider_03.glb as skinned enemy rigs.
+- Named skeleton bones include Hips, Spine, Chest, Head, upper/lower arms, Hand_L/Hand_R, upper/lower legs and feet.
+- First-person guns attach to the Hand_R bone on fp_arms instead of floating under the camera.
+- World/player guns attach to Hand_R on the world character.
+- Raider guns attach to Hand_R on the raider skeleton.
+- Player character model can be changed from ESC -> Settings -> Character Model.
+- Character selection persists locally.
+- Added visible wearable models for helmets, armor, chest rigs and backpacks.
+- Raider deaths now pose/fall through skeleton bones and corpses remain lootable.
+
+Data-driven models:
+- data/models.json controls character files, hand bone names, gear attachment points, and separate FP/world offsets/scale for every firearm.
+- Swap a model or tune its attachment without editing combat logic.
+
+Custom weapon audio:
+- data/weapons.json contains independent audio configuration for all 12 guns.
+- Events: fire, suppressed, reload, dry, equip, action.
+- Each event accepts one MP3 path or an array of MP3 variants.
+- Missing audio falls back to DEADHAUL's synthesized sound.
+- Enemy custom gunshots support spatial positioning.
+- Empty weapons produce exactly one dry-fire click per trigger pull. Holding LMB on an empty gun cannot spam clicks or recoil.
+
+Asset total:
+- 82 custom GLB models.
+
+Local test port:
+- 8783
+
+
+FIRST-PERSON CAMERA FIX
+- Local world-player skinned mesh is hidden from the owning first-person view.
+- Local helmet/armor/rig/backpack world attachments are hidden from the owning camera.
+- Local world weapon is hidden; dedicated fp_arms + hand-bone weapon remain visible.
+- Raiders and other world characters remain fully rendered.
+- Fixes camera spawning inside the operator head/face mesh.

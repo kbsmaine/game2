@@ -1,0 +1,10 @@
+DEADHAUL Build 2.4.4 - Ch15 first-person alignment pass
+
+- First-person Ch15 weapon is camera-mounted for stable forward orientation.
+- Full world weapon remains attached to Ch15 RightHand.
+- Ch15 hands use IK to grip/support the view weapon.
+- Hands moved farther from the camera and elbows opened up.
+- Ch15 shoulders lowered slightly to reduce sleeve/forearm camera crowding.
+- Added category-specific pistol/SMG/rifle/shotgun/bolt weapon mounts.
+- ADS, sprint, recoil, sway, reload and action states now move the camera-mounted weapon coherently with the hands.
+- Local test port 8793.
