@@ -1,9 +1,0 @@
-DEADHAUL Build 2.5.2 — Mixamo Imaginary-Rifle Alignment
-
-- Kept Mixamo as the sole driver of Ch15 first-person shoulder/elbow/arm poses.
-- No first-person IK for Ch15.
-- Local weapon is camera-mounted into the imaginary-rifle space instead of parented to the right hand.
-- Per-weapon mixamoFp values now tune camera-relative position, rotation and scale.
-- Added small configurable post-animation wrist corrections only.
-- Tuned default pistol/SMG/rifle/shotgun/bolt mounts.
-- Local test port 8796.
