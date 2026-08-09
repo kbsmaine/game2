@@ -1,0 +1,10 @@
+DEADHAUL Build 2.3.2 — Custom Full-Body Character
+
+- Added user-supplied Ch15 character as the default full-body world player.
+- Converted the 110 MB binary FBX to an optimized ~6 MB browser GLB.
+- Preserved the 65-bone Mixamo skin/skeleton and two diffuse material regions.
+- Added Mixamo bone aliases for weapon hand, armor, helmet, backpack and procedural world posing.
+- Kept separate first-person arms to prevent camera/head clipping.
+- Single-mesh Ch15 world body is hidden only from the owning first-person camera; it remains visible in the TAB preview/world representation.
+- Existing generated Operator 01–03 models remain selectable in Settings.
+- Build 2.3.1 sprint exhaustion/vibration fix retained.

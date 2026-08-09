@@ -1,0 +1,20 @@
+DEADHAUL Build 2.6.7 — Armor, Plate, Rig, and Storage Pass
+
+- Added real equipment distinction between chest rigs, plate carriers, armor plates, helmets, and backpacks.
+- Added front and back plate slots to the loadout.
+- Plate carriers can accept front/back armor plates; chest rigs cannot.
+- Chest rigs add gear storage only and provide no armor protection.
+- Plate carriers provide small carrier protection and front/back plate protection based on installed plates.
+- Added Level II, III, IV, V, and VI armor plates.
+- Added new carrier types: Slick Plate Carrier and Heavy Plate Carrier.
+- Added new rig types: Security Chest Rig, Tactical Chest Rig, Assault Chest Rig.
+- Added new backpack types: Field Sling Bag and Expedition Rucksack.
+- Updated backpack/rig/carrier storage capacity calculations.
+- Damage now checks hit zone and applies helmet/armor/plate mitigation.
+- Head hitboxes use helmet protection.
+- Chest/pelvis hitboxes use front/back plate depending on incoming bullet direction.
+- Updated inventory/stash UI with front/back plate slots and clearer storage/protection labels.
+- Added item icons for new rigs, carriers, plates, helmets and bags.
+- Added new gear to military/industrial loot tables.
+- Reduced first-person vertical look-down limit to avoid looking straight into legs.
+- Updated Supabase extraction catalog with the new armor/storage gear.

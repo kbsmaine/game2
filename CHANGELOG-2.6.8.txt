@@ -1,0 +1,13 @@
+DEADHAUL BUILD 2.6.8 — TACTICAL CONTAINER INVENTORY
+
+- Rebuilt field inventory into Tarkov-style equipment + rig + pockets + backpack containers.
+- Chest rigs now have real cell counts: Utility 4, Security 6, Tactical 8, Assault 10.
+- Backpacks now have cell counts in addition to weight capacity: 8 / 20 / 30 / 42.
+- Added eight detachable magazine item types for supported pistol/SMG/rifle/shotgun weapons.
+- Compatible magazines stored in rig/pockets/backpack are consumed on reload; HUD displays spare magazines.
+- Tactical loot auto-routes to rig, then pockets, then backpack when picked up.
+- Drag/drop and double-click quick transfer between field containers.
+- Quartermaster loadout preparation now separately shows chest rig, pockets and backpack contents.
+- Prepared tactical items persist in loadout and enter raids in their selected containers.
+- Extracted items include contents carried in rig/pockets/backpack.
+- New magazine SVG inventory icons.

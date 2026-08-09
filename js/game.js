@@ -1,0 +1,945 @@
+(async function(){
+  const A=window.DeadhaulAuth;
+  const session=await A.getSession();if(!session){location.href='index.html';return}
+  let playerData=await A.getPlayerData();
+  let equipment={...(playerData.loadout||A.defaultLoadout||{})};
+  const canvas=document.getElementById('renderCanvas');
+  const engine=new BABYLON.Engine(canvas,true,{preserveDrawingBuffer:true,stencil:true,adaptToDeviceRatio:true});
+  let havokInterface=null;
+  try{if(typeof HavokPhysics==='function'){havokInterface=await HavokPhysics();console.info('DEADHAUL Havok physics ready')}}catch(err){console.warn('DEADHAUL Havok unavailable — physics ragdolls will use fallback',err)}
+  const $=id=>document.getElementById(id);
+  const C=A.catalog;
+  async function loadJsonConfig(path,fallback={}){try{const r=await fetch(path,{cache:'no-store'});if(!r.ok)throw new Error(String(r.status));return await r.json()}catch(err){console.warn('DEADHAUL config fallback',path,err);return fallback}}
+  const MODEL_CONFIG=await loadJsonConfig('data/models.json?v=2.6.8',{characters:{},firstPerson:{file:'fp_arms',weaponBone:'Hand_R'},raiders:[],weapons:{},gear:{}});
+  const WEAPON_MEDIA=await loadJsonConfig('data/weapons.json?v=2.4.0',{weapons:{}});
+  const FP_ANIM=await loadJsonConfig('data/animations.json?v=2.4.0',{weaponProfiles:{},holds:{},actions:{},stateOffsets:{}});
+
+  // Build 2.6.8 — Tarkov-style container inventory + custom animated enemy characters + weapon-class Mixamo locomotion + live weapon alignment editor. The JSON file remains the source of truth;
+  // editor changes are temporary unless copied/saved to browser.
+  const ORIGINAL_WEAPON_MOUNTS=Object.fromEntries(Object.entries(MODEL_CONFIG.weapons||{}).map(([id,c])=>[id,JSON.parse(JSON.stringify(c.mixamoFp||{}))]));
+  const WEAPON_EDITOR_STORAGE_KEY='deadhaul_weapon_alignment_overrides_v4';
+  let weaponEditorOpen=false,weaponEditorSaved={};
+  try{weaponEditorSaved=JSON.parse(localStorage.getItem(WEAPON_EDITOR_STORAGE_KEY)||'{}')||{}}catch{weaponEditorSaved={}}
+  for(const [id,v] of Object.entries(weaponEditorSaved)){if(MODEL_CONFIG.weapons?.[id]&&v&&typeof v==='object')MODEL_CONFIG.weapons[id].mixamoFp={...(MODEL_CONFIG.weapons[id].mixamoFp||{}),...v}}
+
+  // ---------- GAME DATA ----------
+  const WEAPONS={
+    makarov:{model:'weapon_makarov',ammo:'ammo_9x18',ammoLabel:'9x18mm FMJ',mag:8,reserve:40,rpm:420,velocity:315,damage:34,spread:.010,recoil:.026,reload:1.55,auto:false,slot:'secondary'},
+    glock17:{model:'weapon_glock17',ammo:'ammo_9x19',ammoLabel:'9x19mm FMJ',mag:17,reserve:68,rpm:480,velocity:375,damage:36,spread:.008,recoil:.023,reload:1.45,auto:false,slot:'secondary'},
+    pistol1911:{model:'weapon_1911',ammo:'ammo_45',ammoLabel:'.45 ACP FMJ',mag:8,reserve:40,rpm:420,velocity:260,damage:46,spread:.009,recoil:.032,reload:1.7,auto:false,slot:'secondary'},
+    mp5:{model:'weapon_mp5',ammo:'ammo_9x19',ammoLabel:'9x19mm FMJ',mag:30,reserve:120,rpm:800,velocity:400,damage:31,spread:.006,recoil:.012,reload:2.15,auto:true,slot:'primary'},
+    ak74:{model:'weapon_ak74',ammo:'ammo_545',ammoLabel:'5.45x39 PS',mag:30,reserve:120,rpm:650,velocity:880,damage:43,spread:.0045,recoil:.016,reload:2.45,auto:true,slot:'primary'},
+    m4a1:{model:'weapon_m4a1',ammo:'ammo_556',ammoLabel:'5.56x45 M855',mag:30,reserve:120,rpm:780,velocity:910,damage:45,spread:.004,recoil:.014,reload:2.25,auto:true,slot:'primary'},
+    sks:{model:'weapon_sks',ammo:'ammo_762x39',ammoLabel:'7.62x39 PS',mag:10,reserve:70,rpm:330,velocity:735,damage:58,spread:.0038,recoil:.025,reload:2.8,auto:false,slot:'primary'},
+    mosin:{model:'weapon_mosin',ammo:'ammo_762x54',ammoLabel:'7.62x54R LPS',mag:5,reserve:35,rpm:55,velocity:865,damage:86,spread:.0023,recoil:.042,reload:3.3,auto:false,slot:'primary'},
+    pump12:{model:'weapon_pump12',ammo:'ammo_12g',ammoLabel:'12G Buckshot',mag:6,reserve:36,rpm:80,velocity:390,damage:17,pellets:8,spread:.030,recoil:.048,reload:2.9,auto:false,slot:'primary'},
+    saiga12:{model:'weapon_saiga12',ammo:'ammo_12g',ammoLabel:'12G Buckshot',mag:8,reserve:40,rpm:260,velocity:410,damage:15,pellets:8,spread:.027,recoil:.036,reload:2.6,auto:false,slot:'primary'},
+    r700:{model:'weapon_r700',ammo:'ammo_308',ammoLabel:'.308 Match',mag:5,reserve:30,rpm:48,velocity:890,damage:92,spread:.0018,recoil:.045,reload:3.2,auto:false,slot:'primary'},
+    vector:{model:'weapon_vector',ammo:'ammo_9x19',ammoLabel:'9x19mm FMJ',mag:25,reserve:125,rpm:1050,velocity:370,damage:30,spread:.006,recoil:.009,reload:2.1,auto:true,slot:'primary'}
+  };
+
+  const GEAR_META={
+    field_sling:{type:'backpack',capacity:16,slots:8,grid:[4,2]},scav_pack:{type:'backpack',capacity:38,slots:20,grid:[5,4]},patrol_pack:{type:'backpack',capacity:52,slots:30,grid:[6,5]},expedition_pack:{type:'backpack',capacity:72,slots:42,grid:[7,6]},
+    chest_rig:{type:'rig',capacity:10,slots:4,armor:false},security_rig:{type:'rig',capacity:14,slots:6,armor:false},tactical_rig:{type:'rig',capacity:20,slots:8,armor:false},assault_rig:{type:'rig',capacity:26,slots:10,armor:false},
+    soft_armor:{type:'softArmor',armor:true,softLevel:2,storage:0},
+    slick_carrier:{type:'plateCarrier',armor:true,storage:6,front:true,back:true},plate_carrier:{type:'plateCarrier',armor:true,storage:10,front:true,back:true},heavy_plate_carrier:{type:'plateCarrier',armor:true,storage:14,front:true,back:true},
+    armor_plate_lvl2:{type:'plate',level:2,mitigation:.34},armor_plate_lvl3:{type:'plate',level:3,mitigation:.45},armor_plate_lvl4:{type:'plate',level:4,mitigation:.58},armor_plate_lvl5:{type:'plate',level:5,mitigation:.68},armor_plate_lvl6:{type:'plate',level:6,mitigation:.78},
+    helmet:{type:'helmet',level:3,mitigation:.46},fast_helmet:{type:'helmet',level:4,mitigation:.56},heavy_visor_helmet:{type:'helmet',level:5,mitigation:.68,face:true},gas_mask:{type:'helmet',level:1,mitigation:.16,face:true}
+  };
+  function gearMeta(id){return GEAR_META[id]||{}}
+  function isPlateCarrier(id){return gearMeta(id).type==='plateCarrier'}
+  function isArmorPlate(id){return gearMeta(id).type==='plate'}
+  function backpackCapacity(id=equipment.backpack){return gearMeta(id).capacity??8}
+  function rigCapacity(id=equipment.rig){return gearMeta(id).capacity??0}
+  function rigSlotCount(id=equipment.rig){return Math.max(0,Number(gearMeta(id).slots||0))}
+  function backpackSlotCount(id=equipment.backpack){return Math.max(0,Number(gearMeta(id).slots||8))}
+  function preparedRig(){if(!Array.isArray(equipment._rigItems))equipment._rigItems=[];return equipment._rigItems}
+  function preparedPockets(){if(!Array.isArray(equipment._pocketItems))equipment._pocketItems=[];return equipment._pocketItems}
+  function isMagazine(id){return C[id]?.category==='magazine'}
+  function canStoreInRig(id){const c=C[id]?.category;return ['magazine','ammo','medical','throwable','food'].includes(c)}
+  function canStoreInPocket(id){const c=C[id]?.category;return ['magazine','ammo','medical','throwable','food','valuable'].includes(c)&&(C[id]?.weight||0)<=1.25}
+  function magazineForWeapon(id){return {makarov:'mag_pm_8',glock17:'mag_g17_17',pistol1911:'mag_1911_8',mp5:'mag_mp5_30',ak74:'mag_ak74_30',m4a1:'mag_m4_30',saiga12:'mag_saiga_8',vector:'mag_vector_25'}[id]||null}
+  function carrierStorageCapacity(id=equipment.armor){return isPlateCarrier(id)?(gearMeta(id).storage||0):0}
+  function fieldCarryCapacity(loadout=equipment){return (gearMeta(loadout.backpack).capacity??8)+(gearMeta(loadout.rig).capacity??0)+(isPlateCarrier(loadout.armor)?(gearMeta(loadout.armor).storage||0):0)}
+  function plateSlotForItem(id){if(!isArmorPlate(id))return null;if(!isPlateCarrier(equipment.armor))return null;return !equipment.front_plate?'front_plate':!equipment.back_plate?'back_plate':'front_plate'}
+  function slotCapacityBreakdown(){return `BP ${backpackCapacity()} + RIG ${rigCapacity()} + PC ${carrierStorageCapacity()} KG`}
+  function projectedLoadout(slot,id){const copy={...equipment};copy[slot]=id;return copy}
+  function capacityWith(slot,id){return fieldCarryCapacity(projectedLoadout(slot,id))}
+  function canWearPlateSlot(slot){return ['front_plate','back_plate'].includes(slot)}
+  function armorProtectionLabel(){const front=C[equipment.front_plate]?.name||'NO FRONT PLATE',back=C[equipment.back_plate]?.name||'NO BACK PLATE';return `${C[equipment.armor]?.name||'NO ARMOR'} // ${front} // ${back}`}
+  function storageLabel(){return `Total carry ${bagCapacity()} KG (${slotCapacityBreakdown()})`}
+
+
+  const MAPS={
+    industrial:{name:'Industrial Fringe',code:'ZONE // IF-03',difficulty:'MODERATE',loot:'TOOLS · TECH · FUEL',description:'Warehouse district, service station and fenced equipment yard. High-value industrial salvage with mixed scav activity.',spawn:[6,1.75,-48],extract:[7,.08,48],fog:'#151a18'},
+    clinic:{name:'Mercy Clinic',code:'ZONE // MC-12',difficulty:'HIGH',loot:'MEDICAL · TECH · VALUABLES',description:'Abandoned urgent-care campus and emergency annex. Dense interiors, short sightlines and concentrated medical supplies.',spawn:[0,1.75,-42],extract:[-28,.08,34],fog:'#181b19'},
+    checkpoint:{name:'Route 17 Checkpoint',code:'ZONE // R17',difficulty:'SEVERE',loot:'WEAPONS · AMMO · MILITARY',description:'Collapsed military screening point on the highway. Stronger armed hostiles guard weapons, communications gear and ammunition.',spawn:[0,1.75,-52],extract:[35,.08,42],fog:'#181711'}
+  };
+  const LOOT_TABLES={
+    industrial:['copper_wire','copper_wire','battery','drill','wrench_set','spark_plugs','fuel_can','tool_case','power_inverter','motor','circuit_board','ssd','work_gloves','field_sling','scav_pack'],
+    medical:['bandage','bandage','medkit','morphine','splint','antibiotic','blood_bag','water_bottle'],
+    office:['cash_bundle','wristwatch','ssd','circuit_board','keycard','coffee','water_bottle','gold_chain'],
+    civilian:['canned_beans','water_bottle','energy_bar','bandage','cash_bundle','wristwatch','ammo_9x19','ammo_9x18','tactical_gloves'],
+    military:['mag_ak74_30','mag_m4_30','mag_mp5_30','mag_vector_25','mag_saiga_8','mag_g17_17','mag_pm_8','ammo_545','ammo_556','ammo_762x39','ammo_762x54','ammo_12g','ammo_308','medkit','military_radio','keycard','plate_carrier','slick_carrier','heavy_plate_carrier','armor_plate_lvl3','armor_plate_lvl4','armor_plate_lvl5','armor_plate_lvl6','helmet','fast_helmet','heavy_visor_helmet','gas_mask','chest_rig','security_rig','tactical_rig','assault_rig','expedition_pack','tactical_gloves','winter_gloves','frag_grenade','frag_grenade'],
+    weapons:['makarov','glock17','pistol1911','mp5','ak74','m4a1','sks','mosin','pump12','saiga12','r700','vector']
+  };
+  const CONTAINER_INFO={
+    duffel:{label:'DUFFEL BAG',model:'duffel_bag',table:'civilian',count:[2,5]},
+    crate:{label:'SUPPLY CRATE',model:'storage_crate',table:'industrial',count:[2,4]},
+    tools:{label:'TOOL CABINET',model:'tool_cabinet',table:'industrial',count:[2,5]},
+    medical:{label:'MEDICAL CASE',model:'medical_case',table:'medical',count:[2,5]},
+    filing:{label:'FILING CABINET',model:'filing_cabinet',table:'office',count:[1,4]},
+    weapon:{label:'WEAPON CRATE',model:'weapon_crate',table:'weapons',count:[1,2],bonus:'military'},
+    ammo:{label:'AMMO CAN',model:'ammo_can',table:'military',count:[2,5]},
+    locker:{label:'LOCKER',model:'locker_bank',table:'military',count:[2,5]}
+  };
+
+  // ---------- STATE ----------
+  let currentScene=null,currentCamera=null,playerBody=null,sceneMode='bunker';
+  let interactions=[],nearest=null,selectedMapId='industrial',raidStart=0,timerHandle=null,transitionInProgress=false;
+  let fieldItems=[],fieldRigItems=[],fieldPocketItems=[],fieldWeight=0,hauledHeavy=null,health=100,stamina=100,playerDead=false,sprintExhausted=false,sprintReleaseSeen=false,actualSprinting=false;
+  let bullets=[],enemies=[],ragdolls=[],bloodParticles=[],lootSource=null;
+  let viewWeapon=null,activeWeaponSlot='primary',weaponStates={},fireHeld=false,aimHeld=false,reloading=false,lastShotAt=0,weaponKick=0,swayTime=0,reloadStartedAt=0,reloadEndsAt=0,weaponPartBases=new Map();
+  let playerWorldRig=null,playerFpBodyRig=null,fpRig=null,playerGearRoots=[],playerFpGearRoots=[],playerWorldWeapon=null,characterCycle=0,playerHitboxes=[],playerShadowGenerator=null;
+  let locomotionMoveBlend=0,locomotionSprintBlend=0,locomotionLean=0;
+  const authoredRigStates=new WeakMap();
+  let activeFpAction=null,actionBusy=false,actionProp=null,grenades=[],containerAnimations=[],fpAimBlend=0,fpSprintBlend=0,fpIK=null;
+  let mixamoWeaponFollowRef=null,mixamoWeaponFollowWarmup=0;
+  let previewEngine=null,previewScene=null,previewToken=0;
+  let selectedCharacter=localStorage.getItem('deadhaul_character')||Object.keys(MODEL_CONFIG.characters||{})[0]||'player_ch15';if(/^player_0[123]$/.test(selectedCharacter)&&MODEL_CONFIG.characters?.player_ch15){selectedCharacter='player_ch15';localStorage.setItem('deadhaul_character',selectedCharacter)}
+  const audioBuffers=new Map();let audioContext=null;
+  let flashlight=null,flashlightOn=false;
+  const keys={w:false,a:false,s:false,d:false,shift:false};
+  let grounded=false,jumpQueued=false,verticalVelocity=0;
+  let settingsOpen=false,inventoryOpen=false,lootOpen=false,mapOpen=false,stashOpen=false,customizationOpen=false,suppressPointerSettings=false;
+  let safehouseDisplayRoots=[],safehouseCustomizationRoots=[],safehouseSceneRefs=null,footstepClock=0,lastFootstepSide=0;
+  const PLAYER_EYE_HEIGHT=1.68,PLAYER_HEIGHT=1.72,PLAYER_RADIUS=.34,WALK_SPEED=4.5,SPRINT_SPEED=7.2,JUMP_SPEED=5.7,GRAVITY=-15.5;
+  const DEFAULT_BODY_CAMERA_FORWARD=.20;
+  function bagCapacity(){return fieldCarryCapacity(equipment)}
+  function preparedBag(){if(!Array.isArray(equipment._bag))equipment._bag=[];return equipment._bag}
+  function allPreparedItems(){return [...preparedBag(),...preparedRig(),...preparedPockets()]}
+  function allFieldItems(){return [...fieldItems,...fieldRigItems,...fieldPocketItems]}
+  const SENSITIVITY_KEY='deadhaul_mouse_sensitivity',FOV_KEY='deadhaul_fov';
+  let mouseSensitivity=clamp(parseFloat(localStorage.getItem(SENSITIVITY_KEY)||'1')||1,.2,3);
+  let fieldFov=clamp(parseFloat(localStorage.getItem(FOV_KEY)||'88')||88,70,105);
+  const mats={};
+  const SAFEHOUSE_STORAGE_KEY='deadhaul_safehouse_v1_'+(session?.user?.id||'local');
+  function loadSafehouseConfig(){const defaults={theme:'concrete',floor:'sealed',lampColor:'white',light:.82,decor:'survival',clutter:'normal',display:[]};try{return {...defaults,...(JSON.parse(localStorage.getItem(SAFEHOUSE_STORAGE_KEY)||'{}')||{})}}catch{return{...defaults}}}
+  let safehouseConfig=loadSafehouseConfig();
+  function saveSafehouseConfig(){localStorage.setItem(SAFEHOUSE_STORAGE_KEY,JSON.stringify(safehouseConfig))}
+
+  function clamp(n,a,b){return Math.max(a,Math.min(b,n))}
+  function rand(a,b){return a+Math.random()*(b-a)}
+  function choose(arr){return arr[Math.floor(Math.random()*arr.length)]}
+  function isDisposedSafe(obj){if(!obj)return true;try{const v=obj.isDisposed;return typeof v==='function'?!!v.call(obj):v===true}catch{return false}}
+  function anyPanelOpen(){return settingsOpen||inventoryOpen||lootOpen||mapOpen||stashOpen||customizationOpen||weaponEditorOpen||!$('extractOverlay').classList.contains('hidden')||!$('deathOverlay').classList.contains('hidden')||!$('deploymentOverlay').classList.contains('hidden')}
+  function toast(msg,ms=1700){$('toast').textContent=msg;$('toast').classList.remove('hidden');clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').classList.add('hidden'),ms)}
+  function formatTime(s){s=Math.max(0,Math.floor(Number(s)||0));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+
+  // ---------- RENDER HELPERS ----------
+  function mat(scene,name,color,emissive){const key=name+'-'+scene.uid;if(mats[key])return mats[key];const m=new BABYLON.StandardMaterial(name,scene);m.diffuseColor=BABYLON.Color3.FromHexString(color);m.specularColor=new BABYLON.Color3(.06,.06,.06);if(emissive)m.emissiveColor=BABYLON.Color3.FromHexString(emissive);mats[key]=m;return m}
+  function addStaticPhysicsBox(scene,node,size){if(!scene?.metadata?.deadhaulPhysics||!BABYLON.PhysicsAggregate||!BABYLON.PhysicsShapeType)return null;try{const a=new BABYLON.PhysicsAggregate(node,BABYLON.PhysicsShapeType.BOX,{mass:0,friction:.82,restitution:.02,extents:new BABYLON.Vector3(size[0],size[1],size[2])},scene);node.metadata={...(node.metadata||{}),physicsAggregate:a};return a}catch(err){console.warn('Static physics proxy failed',node?.name,err);return null}}
+  function box(scene,name,size,pos,material,collide=true,pickable=true){const b=BABYLON.MeshBuilder.CreateBox(name,{width:size[0],height:size[1],depth:size[2]},scene);b.position=new BABYLON.Vector3(...pos);b.material=material;b.checkCollisions=!!collide;b.isPickable=!!pickable;if(collide)addStaticPhysicsBox(scene,b,size);return b}
+  function cyl(scene,name,diameter,height,pos,material,collide=true){const m=BABYLON.MeshBuilder.CreateCylinder(name,{diameter,height,tessellation:16},scene);m.position=new BABYLON.Vector3(...pos);m.material=material;m.checkCollisions=!!collide;return m}
+  function collisionBox(scene,name,size,pos,rotationY=0){const c=BABYLON.MeshBuilder.CreateBox('COL_'+name,{width:size[0],height:size[1],depth:size[2]},scene);c.position=new BABYLON.Vector3(...pos);c.rotation.y=rotationY;c.isVisible=false;c.isPickable=false;c.checkCollisions=true;c.metadata={ignoreBullet:true,deadhaulCollider:true};if(name!=='enemy')addStaticPhysicsBox(scene,c,size);return c}
+  function interactionTrigger(scene,name,pos,size=[2,2,2]){const t=BABYLON.MeshBuilder.CreateBox('TRIGGER_'+name,{width:size[0],height:size[1],depth:size[2]},scene);t.position=new BABYLON.Vector3(...pos);t.isVisible=false;t.isPickable=false;t.checkCollisions=false;t.metadata={ignoreBullet:true};return t}
+  function proxyFromBounds(scene,root,name,pad=.03){try{root.computeWorldMatrix(true);for(const m of root.getChildMeshes?.()||[])m.computeWorldMatrix(true);const b=root.getHierarchyBoundingVectors(true);const size=b.max.subtract(b.min);if(size.x<.02||size.y<.02||size.z<.02)return null;const center=b.min.add(b.max).scale(.5);return collisionBox(scene,name,[Math.max(.05,size.x-pad),Math.max(.05,size.y-pad),Math.max(.05,size.z-pad)],[center.x,center.y,center.z])}catch{return null}}
+  function structureColliders(scene,type,pos,ry=0){const [x,y,z]=pos;const add=(n,s,l)=>{const c=Math.cos(ry),sn=Math.sin(ry),wx=x+l[0]*c+l[2]*sn,wz=z-l[0]*sn+l[2]*c;return collisionBox(scene,type+n,s,[wx,y+l[1],wz],ry)};
+    if(type==='warehouse'){add('L',[.55,8,28],[-13,4,0]);add('R',[.55,8,28],[13,4,0]);add('B',[26,8,.55],[0,4,14]);add('FL',[7.5,8,.55],[-9.25,4,-14]);add('FR',[7.5,8,.55],[9.25,4,-14]);add('FT',[11,2,.55],[0,7,-14]);add('dock',[11,1.1,4],[0,.55,-16])}
+    if(type==='gas_station'){add('L',[.45,4.4,9],[-6,2.2,0]);add('R',[.45,4.4,9],[6,2.2,0]);add('B',[12,4.4,.45],[0,2.2,4.5]);add('FL',[4.2,4.4,.45],[-3.9,2.2,-4.5]);add('FR',[4.2,4.4,.45],[3.9,2.2,-4.5])}
+    if(type==='clinic_building'){add('L',[.45,5,24],[-12,2.5,0]);add('R',[.45,5,24],[12,2.5,0]);add('B',[24,5,.45],[0,2.5,12]);add('FL',[8,5,.45],[-8,2.5,-12]);add('FR',[8,5,.45],[8,2.5,-12]);add('FT',[8,1.2,.45],[0,4.4,-12]);add('i1',[.25,3.3,8],[-3.5,1.65,6]);add('i2',[.25,3.3,8],[-3.5,1.65,-6]);add('i3',[.25,3.3,7],[4,1.65,6.5]);add('i4',[.25,3.3,7],[4,1.65,-6.5])}
+  }
+  async function loadModel(scene,file,pos=[0,0,0],opts={}){try{const result=await BABYLON.SceneLoader.ImportMeshAsync('','assets/models/',file+'.glb',scene);const root=result.meshes[0];root.name=opts.name||file;root.position=new BABYLON.Vector3(...pos);root.rotation.y=opts.rotationY||0;root.rotation.x=opts.rotationX||0;root.rotation.z=opts.rotationZ||0;const s=opts.scale??1;root.scaling.set(s,s,s);for(const m of result.meshes){m.checkCollisions=false;m.isPickable=opts.pickable!==false&&!!(m.getTotalVertices&&m.getTotalVertices()>0);m.receiveShadows=true;m.metadata={...(m.metadata||{}),assetRoot:root,assetName:file}}root.metadata={...(root.metadata||{}),deadhaulAnimationGroups:result.animationGroups||[],deadhaulAsset:file};
+      root.computeWorldMatrix(true);if(opts.collision!==false){if(['warehouse','gas_station','clinic_building'].includes(file))structureColliders(scene,file,pos,opts.rotationY||0);else proxyFromBounds(scene,root,file+'_'+Math.random().toString(36).slice(2,6),opts.colliderPad??.05)}return root}catch(err){console.error('Asset failed',file,err);const f=box(scene,'missing_'+file,[1,1,1],pos,mat(scene,'missing','#6f3430'),opts.collision!==false,false);return f}}
+
+  // ---------- CAMERA / PLAYER ----------
+  function makePlayerBody(scene,spawn){const b=BABYLON.MeshBuilder.CreateBox('playerBody',{width:.7,height:PLAYER_HEIGHT,depth:.7},scene);b.isVisible=false;b.visibility=0;b.isPickable=false;b.checkCollisions=true;b.ellipsoid=new BABYLON.Vector3(PLAYER_RADIUS,PLAYER_HEIGHT/2,PLAYER_RADIUS);b.ellipsoidOffset=new BABYLON.Vector3(0,PLAYER_HEIGHT/2,0);b.position=new BABYLON.Vector3(spawn[0],.03,spawn[2]);b.metadata={playerController:true,ignoreBullet:true};playerBody=b;verticalVelocity=0;grounded=false;jumpQueued=false;return b}
+
+  async function loadRiggedModel(scene,file,pos=[0,0,0],opts={}){
+    const result=await BABYLON.SceneLoader.ImportMeshAsync('','assets/models/',file+'.glb',scene);
+    const root=result.meshes[0];root.name=opts.name||file;root.position=new BABYLON.Vector3(...pos);root.rotation=new BABYLON.Vector3(opts.rotationX||0,opts.rotationY||0,opts.rotationZ||0);const sc=opts.scale??1;root.scaling.set(sc,sc,sc);
+    for(const m of result.meshes){m.checkCollisions=false;m.isPickable=opts.pickable!==false&&!!(m.getTotalVertices&&m.getTotalVertices()>0);m.receiveShadows=true;m.metadata={...(m.metadata||{}),assetRoot:root,assetName:file}}
+    const skinMesh=result.meshes.find(m=>m?.skeleton&&m.getTotalVertices&&m.getTotalVertices()>0)||result.meshes.find(m=>m.getTotalVertices&&m.getTotalVertices()>0)||root;return {root,skeleton:result.skeletons?.[0]||null,meshes:result.meshes,bones:result.skeletons?.[0]?.bones||[],skinMesh,result,boneAliases:opts.boneAliases||{},singleSkinnedMesh:!!opts.singleSkinnedMesh};
+  }
+  function boneByName(rig,name){if(!rig?.skeleton)return null;const exact=rig.skeleton.bones?.find(b=>b.name===name);if(exact)return exact;const alias=rig.boneAliases?.[name];if(alias){const hit=rig.skeleton.bones?.find(b=>b.name===alias);if(hit)return hit}const fallback={Hips:'mixamorig:Hips',Spine:'mixamorig:Spine',Chest:'mixamorig:Spine2',Neck:'mixamorig:Neck',Head:'mixamorig:Head',UpperArm_L:'mixamorig:LeftArm',LowerArm_L:'mixamorig:LeftForeArm',Hand_L:'mixamorig:LeftHand',UpperArm_R:'mixamorig:RightArm',LowerArm_R:'mixamorig:RightForeArm',Hand_R:'mixamorig:RightHand',UpperLeg_L:'mixamorig:LeftUpLeg',LowerLeg_L:'mixamorig:LeftLeg',Foot_L:'mixamorig:LeftFoot',UpperLeg_R:'mixamorig:RightUpLeg',LowerLeg_R:'mixamorig:RightLeg',Foot_R:'mixamorig:RightFoot'}[name];return fallback?rig.skeleton.bones?.find(b=>b.name===fallback)||null:null}
+  function setBoneEuler(bone,x=0,y=0,z=0){if(!bone)return;try{if(typeof bone.setRotation==='function')bone.setRotation(new BABYLON.Vector3(x,y,z),BABYLON.Space.LOCAL);else if(typeof bone.setRotationQuaternion==='function')bone.setRotationQuaternion(BABYLON.Quaternion.RotationYawPitchRoll(y,x,z),BABYLON.Space.LOCAL)}catch{}}
+  function attachAssetToBone(root,bone,bindMesh,cfg={}){const pos=cfg.position||[0,0,0],rot=cfg.rotation||[0,0,0],sc=cfg.scale??1;try{if(bone&&bindMesh&&typeof root.attachToBone==='function')root.attachToBone(bone,bindMesh);else root.parent=bindMesh}catch{root.parent=bindMesh}root.position=new BABYLON.Vector3(...pos);root.rotation=new BABYLON.Vector3(...rot);root.scaling.set(sc,sc,sc);return root}
+  function hitMultiplierForMesh(name=''){name=name.toLowerCase();if(name.includes('head'))return 2.2;if(name.includes('chest')||name.includes('spine'))return 1;if(name.includes('hips'))return .95;if(name.includes('arm')||name.includes('hand'))return .72;if(name.includes('leg')||name.includes('foot'))return .78;return 1}
+  function playableBodyConfig(){return MODEL_CONFIG.characters?.[selectedCharacter]?.firstPersonBody||{}}
+  function playableBodyEnabled(){return playableBodyConfig().enabled===true}
+  function setRigVisible(rig,on){if(!rig?.root)return;try{rig.root.setEnabled(true)}catch{}for(const m of rig.meshes||[]){if(!(m.getTotalVertices&&m.getTotalVertices()>0))continue;m.visibility=on?1:0;m.isVisible=!!on;m.isPickable=false;m.alwaysSelectAsActiveMesh=!!on;if(on&&m.material){try{m.material.backFaceCulling=true}catch{}}}}
+  function configureLocalPlayableBody(rig){
+    if(!rig?.root)return;
+    // The full world body remains the authoritative gameplay rig but is hidden from the owning first-person view.
+    // A synchronized headless copy renders body-awareness locally.
+    setRigVisible(rig,false);
+    for(const m of rig.meshes||[])m.metadata={...(m.metadata||{}),ignoreBullet:true,playerVisual:true,authoritativePlayerBody:true};
+  }
+  function clearPlayerHitboxes(){for(const h of playerHitboxes){try{h.dispose()}catch{}}playerHitboxes=[]}
+  function createPlayerHitboxes(scene,rig){
+    clearPlayerHitboxes();if(!rig?.skeleton||!playerBody)return;
+    const defs=[
+      ['head','Head',[.28,.30,.28],[0,.02,0],2.05],
+      ['chest','Chest',[.46,.55,.30],[0,-.05,0],1.0],
+      ['pelvis','Hips',[.40,.34,.28],[0,.02,0],.95],
+      ['armL','UpperArm_L',[.18,.42,.18],[0,-.18,0],.72],
+      ['armR','UpperArm_R',[.18,.42,.18],[0,-.18,0],.72],
+      ['legL','UpperLeg_L',[.22,.62,.22],[0,-.28,0],.78],
+      ['legR','UpperLeg_R',[.22,.62,.22],[0,-.28,0],.78]
+    ];
+    for(const [name,boneName,size,pos,multiplier] of defs){
+      const bone=boneByName(rig,boneName);if(!bone)continue;
+      const h=BABYLON.MeshBuilder.CreateBox('PLAYER_HIT_'+name,{width:size[0],height:size[1],depth:size[2]},scene);
+      h.isVisible=true;h.visibility=0;h.isPickable=true;h.checkCollisions=false;h.metadata={playerTarget:true,playerHitbox:true,zone:name,multiplier,ignoreBullet:false};
+      try{h.attachToBone(bone,rig.skinMesh||rig.root)}catch{h.parent=rig.root}
+      h.position=new BABYLON.Vector3(...pos);playerHitboxes.push(h);
+    }
+  }
+  function registerPlayerShadowMeshes(rig){if(!playerShadowGenerator||!rig)return;for(const m of rig.meshes||[]){if(m.getTotalVertices&&m.getTotalVertices()>0){try{playerShadowGenerator.addShadowCaster(m,true)}catch{}}}}
+  function showLocalAttachedVisual(root){
+    if(!root)return root;try{root.setEnabled(true)}catch{}root.visibility=1;root.isVisible=true;root.isPickable=false;
+    for(const m of root.getChildMeshes?.()||[]){m.visibility=1;m.isVisible=true;m.isPickable=false;m.metadata={...(m.metadata||{}),ignoreBullet:true,playerGearVisual:true};try{playerShadowGenerator?.addShadowCaster(m,true)}catch{}}
+    return root;
+  }
+  function hideLocalAttachedVisual(root){
+    if(!root)return root;
+    try{root.setEnabled(false)}catch{}
+    root.visibility=0;root.isVisible=false;root.isPickable=false;
+    for(const m of root.getChildMeshes?.()||[]){m.visibility=0;m.isVisible=false;m.isPickable=false;m.metadata={...(m.metadata||{}),ignoreBullet:true,localFirstPersonHidden:true}}
+    return root;
+  }
+  function configureCharacterMeshes(rig,enemyRef=null){for(const m of rig?.meshes||[]){if(!(m.getTotalVertices&&m.getTotalVertices()>0))continue;if(enemyRef){m.isPickable=true;m.metadata={...(m.metadata||{}),enemyPart:true,enemyRef,multiplier:hitMultiplierForMesh(m.name)}}else{m.isPickable=false;m.metadata={...(m.metadata||{}),ignoreBullet:true,playerVisual:true}}}}
+  async function attachGearToRig(scene,rig,targetRoots,{includeHead=true,localBody=false}={}){for(const g of targetRoots){try{g.dispose(false,true)}catch{}}targetRoots.length=0;if(!rig?.skeleton)return;for(const id of [equipment.head,equipment.armor,equipment.rig,equipment.backpack]){if(!includeHead&&id===equipment.head)continue;const cfg=MODEL_CONFIG.gear?.[id];if(!cfg)continue;try{const root=await loadModel(scene,cfg.file,[0,0,0],{collision:false,pickable:false,scale:1});attachAssetToBone(root,boneByName(rig,cfg.bone||'Chest'),rig.skinMesh||rig.root,cfg);for(const m of root.getChildMeshes?.()||[]){m.metadata={...(m.metadata||{}),ignoreBullet:true,localBodyGear:localBody};m.isPickable=false}if(localBody)showLocalAttachedVisual(root);else hideLocalAttachedVisual(root);targetRoots.push(root)}catch(err){console.warn('gear attach failed',id,err)}}}
+  async function attachFirstPersonTorsoVisual(scene,rig){
+    for(const g of playerFpGearRoots){try{g.dispose(false,true)}catch{}}playerFpGearRoots=[];if(!rig?.skeleton)return;
+    const chest=boneByName(rig,'Chest');if(!chest)return;
+    try{const torso=await loadModel(scene,'gear_torso_base',[0,0,0],{collision:false,pickable:false,scale:1});attachAssetToBone(torso,chest,rig.skinMesh||rig.root,{position:[0,-.17,.015],rotation:[0,0,0],scale:.88});showLocalAttachedVisual(torso);for(const m of torso.getChildMeshes?.()||[]){m.renderingGroupId=1;m.alwaysSelectAsActiveMesh=true}playerFpGearRoots.push(torso)}catch(err){console.warn('first-person torso failed',err)}
+    for(const id of [equipment.armor,equipment.rig]){const cfg=MODEL_CONFIG.gear?.[id];if(!cfg)continue;try{const gr=await loadModel(scene,cfg.file,[0,0,0],{collision:false,pickable:false,scale:1});const fpCfg={...cfg,position:[(cfg.position?.[0]||0),(cfg.position?.[1]||0)-.04,(cfg.position?.[2]||0)+.025],scale:(cfg.scale??1)*.82};attachAssetToBone(gr,chest,rig.skinMesh||rig.root,fpCfg);showLocalAttachedVisual(gr);for(const m of gr.getChildMeshes?.()||[]){m.renderingGroupId=1;m.alwaysSelectAsActiveMesh=true}playerFpGearRoots.push(gr)}catch(err){console.warn('first-person chest gear failed',id,err)}}
+  }
+  async function attachConfiguredGear(scene,rig){await attachGearToRig(scene,rig,playerGearRoots,{includeHead:true,localBody:false});if(playerFpBodyRig)await attachFirstPersonTorsoVisual(scene,playerFpBodyRig)}
+  async function loadFirstPersonBodyRig(scene,force=false){const cfg=MODEL_CONFIG.characters?.[selectedCharacter],bc=cfg?.firstPersonBody||{};if(!bc.enabled||!bc.file)return null;if(playerFpBodyRig&&!force&&playerFpBodyRig.root?.getScene?.()===scene)return playerFpBodyRig;if(playerFpBodyRig){try{playerFpBodyRig.root.dispose(false,true)}catch{}}for(const g of playerFpGearRoots){try{g.dispose(false,true)}catch{}}playerFpGearRoots=[];playerFpBodyRig=null;try{const rig=await loadRiggedModel(scene,bc.file,[playerBody?.position.x||0,playerBody?.position.y||0,playerBody?.position.z||0],{scale:cfg.scale??1,pickable:false,name:'playerFirstPersonBody',boneAliases:cfg.boneAliases||{},singleSkinnedMesh:!!cfg.singleSkinnedMesh});for(const m of rig.meshes||[]){if(m.getTotalVertices&&m.getTotalVertices()>0){m.visibility=1;m.isVisible=true;m.isPickable=false;m.alwaysSelectAsActiveMesh=true;m.metadata={...(m.metadata||{}),ignoreBullet:true,firstPersonBody:true}}}playerFpBodyRig=rig;/* Local first-person body intentionally has no chest/head gear meshes. The authoritative world rig still owns all equipped gear; this prevents armor/rig/backpack geometry from enclosing the camera. */return rig}catch(err){console.warn('first person body load failed',err);return null}}
+  async function attachWorldWeapon(scene,rig){if(playerWorldWeapon&&!isDisposedSafe(playerWorldWeapon))playerWorldWeapon.dispose(false,true);playerWorldWeapon=null;const id=equipment[activeWeaponSlot];const w=WEAPONS[id];if(!w||!rig?.skeleton)return;try{const cfg=MODEL_CONFIG.weapons?.[id]?.world||{};const root=await loadModel(scene,w.model,[0,0,0],{collision:false,pickable:false,scale:1});attachAssetToBone(root,boneByName(rig,MODEL_CONFIG.characters?.[selectedCharacter]?.weaponBone||'Hand_R'),rig.skinMesh||rig.root,cfg);for(const m of root.getChildMeshes?.()||[])m.metadata={...(m.metadata||{}),ignoreBullet:true};hideLocalAttachedVisual(root);playerWorldWeapon=root}catch(err){console.warn('world weapon attach failed',err)}}
+  async function loadPlayerWorldRig(scene,force=false){if(playerWorldRig&&!force&&playerWorldRig.root?.getScene?.()===scene)return playerWorldRig;if(playerWorldRig){try{playerWorldRig.root.dispose(false,true)}catch{}}playerWorldRig=null;const cfg=MODEL_CONFIG.characters?.[selectedCharacter]||Object.values(MODEL_CONFIG.characters||{})[0];if(!cfg)return null;const rig=await loadRiggedModel(scene,cfg.file,[playerBody?.position.x||0,playerBody?.position.y||0,playerBody?.position.z||0],{scale:cfg.scale??1,pickable:false,name:'playerWorldRig',boneAliases:cfg.boneAliases||{},singleSkinnedMesh:!!cfg.singleSkinnedMesh});configureCharacterMeshes(rig,null);configureLocalPlayableBody(rig);playerWorldRig=rig;createPlayerHitboxes(scene,rig);registerPlayerShadowMeshes(rig);await loadFirstPersonBodyRig(scene,true);await attachConfiguredGear(scene,rig);await attachWorldWeapon(scene,rig);return rig}
+  function color3(hex,fallback='#465148'){try{return BABYLON.Color3.FromHexString(hex||fallback)}catch{return BABYLON.Color3.FromHexString(fallback)}}
+  function applyFirstPersonStyle(rig){const cc=MODEL_CONFIG.characters?.[selectedCharacter]||{},style=cc.firstPersonStyle||MODEL_CONFIG.firstPerson?.style||{},handStyle=MODEL_CONFIG.handStyles?.[equipment.hands]||{};for(const m of rig?.meshes||[]){if(!(m.getTotalVertices&&m.getTotalVertices()>0)||!m.material)continue;const n=(m.name||'').toLowerCase(),isHand=n.includes('hand');const clone=m.material.clone?.((m.material.name||'fpMat')+'_'+selectedCharacter+'_'+m.uniqueId)||m.material;if(clone.diffuseColor)clone.diffuseColor=isHand?color3(handStyle.gloveColor||style.gloveColor,'#232b28'):color3(style.sleeveColor,'#3a493f');if(clone.specularColor)clone.specularColor=new BABYLON.Color3(.08,.08,.08);m.material=clone}}
+  async function loadFirstPersonRig(scene){if(fpRig&&fpRig.root?.getScene?.()===scene&&!isDisposedSafe(fpRig.root))return fpRig;if(fpRig){disposeFirstPersonIK();try{fpRig.root.dispose(false,true)}catch{}}fpRig=null;const base=MODEL_CONFIG.firstPerson||{file:'fp_arms'},cc=MODEL_CONFIG.characters?.[selectedCharacter]||{},file=cc.firstPersonFile||base.file||'fp_arms',tr=cc.firstPersonTransform||{},fpScale=Number(tr.scale??base.scale??1);const rig=await loadRiggedModel(scene,file,[0,0,0],{scale:fpScale,pickable:false,name:'firstPersonArms',boneAliases:cc.boneAliases||{},singleSkinnedMesh:!!cc.singleSkinnedMesh});configureCharacterMeshes(rig,null);rig.root.parent=currentCamera;rig.root.position=new BABYLON.Vector3(...(tr.position||base.basePosition||[0,0,0]));rig.root.rotation=new BABYLON.Vector3(...(tr.rotation||base.baseRotation||[0,0,0]));if(cc.firstPersonMirrorX===true){rig.root.scaling.x=-Math.abs(fpScale);rig.root.scaling.y=Math.abs(fpScale);rig.root.scaling.z=Math.abs(fpScale)}for(const m of rig.meshes){m.renderingGroupId=2;m.alwaysSelectAsActiveMesh=true;m.isPickable=false;m.metadata={...(m.metadata||{}),ignoreBullet:true,firstPersonArms:true,mirroredFirstPerson:cc.firstPersonMirrorX===true};if(cc.firstPersonMirrorX===true&&m.material){try{m.material.backFaceCulling=false}catch{}}}if(!cc.firstPersonPreserveMaterials)applyFirstPersonStyle(rig);fpRig=rig;if(selectedCharacter==='player_ch15'){const ac=MODEL_CONFIG.characters?.player_ch15?.firstPersonAuthoredWeaponPose||{};if(ac.enabled&&ac.useIK===false){disposeFirstPersonIK();startFirstPersonAuthoredPose(rig,false,false,{kind:null,t:0})}else setupFirstPersonIK(rig)}return rig}
+  function disposeFirstPersonIK(){if(!fpIK)return;for(const n of [fpIK.rightTarget,fpIK.leftTarget,fpIK.rightPole,fpIK.leftPole]){try{n?.dispose?.()}catch{}}fpIK=null}
+  function fpIKProfile(id){const profile=weaponPoseProfile(id);const profiles={
+    pistol:{right:[.07,-.34,.70],left:[-.025,-.31,.76],rightPole:[.42,-.46,.46],leftPole:[-.42,-.43,.48]},
+    smg:{right:[.105,-.34,.82],left:[-.105,-.255,1.02],rightPole:[.48,-.48,.50],leftPole:[-.48,-.43,.56]},
+    rifle:{right:[.115,-.345,.87],left:[-.125,-.245,1.13],rightPole:[.50,-.49,.52],leftPole:[-.51,-.42,.60]},
+    shotgun:{right:[.12,-.35,.91],left:[-.145,-.235,1.24],rightPole:[.51,-.50,.53],leftPole:[-.53,-.41,.64]},
+    bolt:{right:[.12,-.345,.92],left:[-.14,-.24,1.27],rightPole:[.51,-.49,.53],leftPole:[-.53,-.41,.64]}
+  };return profiles[profile]||profiles.rifle}
+  function ch15WeaponMountProfile(id){const profile=weaponPoseProfile(id),defaults={
+    pistol:{position:[.055,-.205,.61],rotation:[0,Math.PI,0],scale:.67},
+    smg:{position:[.085,-.205,.76],rotation:[0,Math.PI,0],scale:.68},
+    rifle:{position:[.095,-.20,.82],rotation:[0,Math.PI,0],scale:.69},
+    shotgun:{position:[.10,-.205,.88],rotation:[0,Math.PI,0],scale:.66},
+    bolt:{position:[.095,-.20,.92],rotation:[0,Math.PI,0],scale:.67}
+  },custom=firstPersonUsesMixamoWeaponPose()?(MODEL_CONFIG.weapons?.[id]?.mixamoFp||{}):(MODEL_CONFIG.weapons?.[id]?.ch15FpMount||{});return{...defaults[profile]||defaults.rifle,...custom}}
+  function resetMixamoWeaponFollowRef(){mixamoWeaponFollowRef=null;mixamoWeaponFollowWarmup=Number(firstPersonAuthoredWeaponCfg().handFollowWarmupFrames??6)}
+  function calibrateMixamoWeaponFollowRef(){
+    const sample=fpHandSample();
+    if(!sample)return false;
+    mixamoWeaponFollowRef={right:sample.right.clone(),line:sample.line.clone()};
+    mixamoWeaponFollowWarmup=0;
+    return true;
+  }
+  function fpHandSample(){
+    if(!fpRig?.skeleton||!fpRig?.skinMesh||!currentCamera)return null;
+    try{
+      fpRig.skinMesh.computeWorldMatrix(true);fpRig.skeleton.computeAbsoluteMatrices?.();currentCamera.computeWorldMatrix?.(true);
+      const rb=boneByName(fpRig,'Hand_R'),lb=boneByName(fpRig,'Hand_L');if(!rb||!lb)return null;
+      const rw=rb.getAbsolutePosition(fpRig.skinMesh),lw=lb.getAbsolutePosition(fpRig.skinMesh);
+      const inv=currentCamera.getWorldMatrix().clone();inv.invert();
+      const r=BABYLON.Vector3.TransformCoordinates(rw,inv),l=BABYLON.Vector3.TransformCoordinates(lw,inv);
+      return{right:r,left:l,line:l.subtract(r)};
+    }catch(err){return null}
+  }
+  function quatBetweenVectors(from,to){
+    const a=from?.clone?.(),b=to?.clone?.();if(!a||!b||a.lengthSquared()<1e-8||b.lengthSquared()<1e-8)return BABYLON.Quaternion.Identity();
+    a.normalize();b.normalize();const dot=clamp(BABYLON.Vector3.Dot(a,b),-1,1);if(dot>.99999)return BABYLON.Quaternion.Identity();
+    if(dot<-.9999){let axis=BABYLON.Vector3.Cross(a,BABYLON.Axis.X);if(axis.lengthSquared()<1e-6)axis=BABYLON.Vector3.Cross(a,BABYLON.Axis.Y);axis.normalize();return BABYLON.Quaternion.RotationAxis(axis,Math.PI)}
+    const axis=BABYLON.Vector3.Cross(a,b);axis.normalize();return BABYLON.Quaternion.RotationAxis(axis,Math.acos(dot))
+  }
+  function applyMixamoHandWeaponFollow(basePos,baseRot,moving,sprinting,action){
+    const fallback=()=>({pos:[...basePos],rot:[...baseRot]});
+    try{
+      const cfg=firstPersonAuthoredWeaponCfg();if(cfg.followAnimatedHands===false)return fallback();
+      const sample=fpHandSample();if(!sample)return fallback();
+      const neutral=!moving&&!sprinting&&!aimHeld&&!action?.kind;
+      if(!mixamoWeaponFollowRef){
+        if(neutral){
+          if(mixamoWeaponFollowWarmup>0){mixamoWeaponFollowWarmup--;return fallback()}
+          mixamoWeaponFollowRef={right:sample.right.clone(),line:sample.line.clone()};
+        }
+        return fallback();
+      }
+      const posFollow=clamp(Number(cfg.handFollowPosition??1),0,1),rotFollow=clamp(Number(cfg.handFollowRotation??1),0,1);
+      const qRaw=quatBetweenVectors(mixamoWeaponFollowRef.line,sample.line);
+      const qDelta=BABYLON.Quaternion.Slerp(BABYLON.Quaternion.Identity(),qRaw,rotFollow);
+      if(![qDelta.x,qDelta.y,qDelta.z,qDelta.w].every(Number.isFinite))return fallback();
+
+      // F6 values remain the authoritative neutral gun transform. Carry that rigid offset with the
+      // animated Mixamo hand/reference axis without replacing the user's tuned mount.
+      const neutralGun=new BABYLON.Vector3(basePos[0],basePos[1],basePos[2]);
+      const neutralOffset=neutralGun.subtract(mixamoWeaponFollowRef.right);
+      const rotMatrix=BABYLON.Matrix.Identity();
+      qDelta.toRotationMatrix(rotMatrix);
+      const rotatedOffset=BABYLON.Vector3.TransformNormal(neutralOffset,rotMatrix);
+      const followedPos=sample.right.add(rotatedOffset);
+      const blendedPos=BABYLON.Vector3.Lerp(neutralGun,followedPos,posFollow);
+      if(![blendedPos.x,blendedPos.y,blendedPos.z].every(Number.isFinite))return fallback();
+
+      const qBase=BABYLON.Quaternion.FromEulerAngles(baseRot[0],baseRot[1],baseRot[2]);
+      const qFinal=qDelta.multiply(qBase);
+      if(![qFinal.x,qFinal.y,qFinal.z,qFinal.w].every(Number.isFinite))return fallback();
+      const e=qFinal.toEulerAngles();
+      if(![e.x,e.y,e.z].every(Number.isFinite))return fallback();
+      return{pos:[blendedPos.x,blendedPos.y,blendedPos.z],rot:[e.x,e.y,e.z]};
+    }catch(err){
+      console.warn('Mixamo hand-follow frame skipped:',err);
+      return fallback();
+    }
+  }
+  function updateCh15WeaponMount(moving,sprinting,action,dt){
+    if(selectedCharacter!=='player_ch15'||!viewWeapon||viewWeapon.parent!==currentCamera)return;
+    const id=getActiveWeapon()?.id||'ak74',m=ch15WeaponMountProfile(id),base=arr3(m.position),baseRot=arr3(m.rotation);
+    if(weaponEditorOpen){viewWeapon.position.set(...base);viewWeapon.rotation.set(...baseRot);const esc=Number(m.scale??1);viewWeapon.scaling.set(esc,esc,esc);return}
+    let pos=[...base],rr=[...baseRot];
+    if(firstPersonUsesMixamoWeaponPose()){
+      const followed=applyMixamoHandWeaponFollow(base,baseRot,moving,sprinting,action);pos=followed.pos;rr=followed.rot;
+      // The authored animation already provides walk/run/sprint/ADS sway. Keep the weapon locked to that hand motion;
+      // only a small recoil offset is layered on top.
+      pos[1]+=weaponKick*.025;pos[2]-=weaponKick*.055;rr[0]-=weaponKick*.16;
+    }else{
+      if(fpAimBlend>.001){pos=lerp3(pos,[0,-.165,.60],fpAimBlend);rr=lerp3(rr,[0,Math.PI,0],fpAimBlend)}
+      if(fpSprintBlend>.001){pos=lerp3(pos,[.205,-.37,.70],fpSprintBlend);rr=lerp3(rr,[.24,Math.PI-.06,-.22],fpSprintBlend)}
+      if(action?.kind==='reload'){const q=Math.sin(Math.PI*clamp(action.t||0,0,1));pos=lerp3(pos,[.15,-.30,.69],q*.20);rr[2]-=.10*q}else if(action?.kind==='throw_grenade'||action?.kind==='use_medkit'||action?.kind==='use_bandage'){pos[1]-=.18;pos[2]+=.05}
+      const amp=fpAimBlend>.5?.0015:(sprinting?.008:moving?.004:.0015);pos[0]+=Math.sin(swayTime)*amp;pos[1]+=Math.abs(Math.cos(swayTime*.5))*amp*.45+weaponKick*.06;pos[2]-=weaponKick*.10;rr[0]-=weaponKick*.34;rr[2]+=Math.sin(swayTime*.45)*amp*.18;
+    }
+    viewWeapon.position.set(...pos);viewWeapon.rotation.set(...rr);const sc=Number(m.scale??1);viewWeapon.scaling.set(sc,sc,sc)
+  }
+  function setupFirstPersonIK(rig){disposeFirstPersonIK();if(selectedCharacter!=='player_ch15'||!rig?.skeleton||!rig?.skinMesh||typeof BABYLON.BoneIKController!=='function'||!currentCamera)return false;try{const lowerR=boneByName(rig,'LowerArm_R'),lowerL=boneByName(rig,'LowerArm_L');if(!lowerR||!lowerL)return false;const rt=new BABYLON.TransformNode('fpRightGripTarget',currentScene),lt=new BABYLON.TransformNode('fpLeftGripTarget',currentScene),rp=new BABYLON.TransformNode('fpRightElbowPole',currentScene),lp=new BABYLON.TransformNode('fpLeftElbowPole',currentScene);for(const n of [rt,lt,rp,lp])n.parent=currentCamera;const rc=new BABYLON.BoneIKController(rig.skinMesh,lowerR,{targetMesh:rt,poleTargetMesh:rp,maxAngle:Math.PI*.96,slerpAmount:1});const lc=new BABYLON.BoneIKController(rig.skinMesh,lowerL,{targetMesh:lt,poleTargetMesh:lp,maxAngle:Math.PI*.96,slerpAmount:1});fpIK={rig,right:rc,left:lc,rightTarget:rt,leftTarget:lt,rightPole:rp,leftPole:lp};updateFirstPersonIK(false,false,{kind:null,t:0},.016,true);return true}catch(err){console.warn('Ch15 first-person IK setup failed',err);disposeFirstPersonIK();return false}}
+  function setNodeLocal(node,v){if(!node||!v)return;node.position.set(Number(v[0]||0),Number(v[1]||0),Number(v[2]||0))}
+  function updateFirstPersonIK(moving,sprinting,action,dt,force=false){if(!fpIK||fpIK.rig!==fpRig||!currentCamera)return false;const id=getActiveWeapon()?.id||'ak74',p=fpIKProfile(id);let r=[...p.right],l=[...p.left],rp=[...p.rightPole],lp=[...p.leftPole];fpAimBlend+=(Number(aimHeld&&!sprinting)-fpAimBlend)*Math.min(1,(dt||.016)*12);fpSprintBlend+=(Number(sprinting&&!aimHeld)-fpSprintBlend)*Math.min(1,(dt||.016)*10);if(fpAimBlend>0){r=lerp3(r,[.075,-.18,.66],fpAimBlend);l=lerp3(l,[-.07,-.16,.83],fpAimBlend)}if(fpSprintBlend>0){r=lerp3(r,[.23,-.43,.64],fpSprintBlend);l=lerp3(l,[-.17,-.39,.78],fpSprintBlend)}if(action?.kind==='reload'){const q=Math.sin(Math.PI*clamp(action.t||0,0,1));l=lerp3(l,[.04,-.34,.60],q*.92);lp=lerp3(lp,[-.38,-.45,.22],q)}else if(action?.kind==='throw_grenade'){const q=Math.sin(Math.PI*clamp(action.t||0,0,1));r=lerp3(r,[.02,.02,.88],q);l=lerp3(l,[-.12,-.28,.55],q*.7)}else if(action?.kind==='use_medkit'||action?.kind==='use_bandage'){const q=Math.sin(Math.PI*clamp(action.t||0,0,1));r=lerp3(r,[.10,-.30,.54],q);l=lerp3(l,[-.08,-.27,.52],q)}const breathe=(moving?Math.sin(swayTime)*.006:Math.sin(swayTime*.5)*.003)*(1-fpAimBlend)*(1-fpSprintBlend);r[1]+=breathe;l[1]+=breathe*.8;setNodeLocal(fpIK.rightTarget,r);setNodeLocal(fpIK.leftTarget,l);setNodeLocal(fpIK.rightPole,rp);setNodeLocal(fpIK.leftPole,lp);try{fpRig.skinMesh.computeWorldMatrix(true);fpRig.skeleton.computeAbsoluteMatrices?.();fpIK.right.update();fpRig.skeleton.computeAbsoluteMatrices?.();fpIK.left.update();return true}catch(err){if(force)console.warn('Ch15 first-person IK update failed',err);return false}}
+
+  function authoredLocomotionCfg(){return MODEL_CONFIG.characters?.[selectedCharacter]?.authoredLocomotion||{}}
+  function authoredWeaponSet(id=getActiveWeapon()?.id){if(!id)return'unarmed';return MODEL_CONFIG.weapons?.[id]?.animationSet||(weaponPoseProfile(id)==='pistol'?'pistol':'rifle')}
+  function hasAuthoredLocomotion(rig){const c=authoredLocomotionCfg();return selectedCharacter==='player_ch15'&&c.enabled===true&&!!findAnimationGroup(rig,c.unarmedIdle||'unarmed_idle')}
+  function armedForLocomotion(){return !!getActiveWeapon()}
+  function desiredAuthoredLocomotion(moving,sprinting){const c=authoredLocomotionCfg(),w=getActiveWeapon();if(!w)return moving?(c.unarmedWalk||'unarmed_walk'):(c.unarmedIdle||'unarmed_idle');if(authoredWeaponSet(w.id)==='pistol'){if(sprinting)return c.pistolRun||'pistol_run';if(aimHeld&&!moving)return c.pistolAimIdle||'pistol_aim_idle';if(moving)return c.pistolWalk||'pistol_walk';return c.pistolIdle||'pistol_idle'}if(sprinting)return c.useHighReadySprint?(c.rifleSprintHighReady||'rifle_sprint'):(c.rifleRun||'rifle_run');if(aimHeld&&!moving)return c.rifleAimIdle||'rifle_aim_idle';if(moving)return c.rifleWalk||'rifle_walk';return c.rifleIdle||'rifle_idle'}
+  function authoredLocomotionSpeed(clip){const c=authoredLocomotionCfg(),r=c.speedRatios||{};if(clip===(c.unarmedWalk||'unarmed_walk'))return Number(r.unarmedWalk||1);if(clip===(c.pistolWalk||'pistol_walk'))return Number(r.pistolWalk||1);if(clip===(c.pistolRun||'pistol_run'))return Number(r.pistolRun||1);if(clip===(c.pistolSprint||'pistol_sprint'))return Number(r.pistolSprint||1);if(clip===(c.rifleWalk||'rifle_walk'))return Number(r.rifleWalk||1);if(clip===(c.rifleRun||'rifle_run'))return Number(r.rifleRun||1);if(clip===(c.rifleSprintHighReady||'rifle_sprint'))return Number(r.rifleSprintHighReady||1);return 1}
+  function startAuthoredLocomotion(rig,clip,speed=1){if(!rig||!clip)return false;const g=findAnimationGroup(rig,clip);if(!g)return false;const prev=authoredRigStates.get(rig);if(prev?.clip===clip&&prev?.group===g){try{g.speedRatio=speed}catch{}return true}try{for(const other of animationGroupsOf(rig)){if(other===g)continue;try{other.stop()}catch{}}const blend=Number(authoredLocomotionCfg().blendSpeed||.1);for(const ta of g.targetedAnimations||[]){if(ta?.animation){ta.animation.enableBlending=true;ta.animation.blendingSpeed=blend}}g.stop();g.start(true,speed,g.from,g.to,false);authoredRigStates.set(rig,{clip,group:g});return true}catch(err){console.warn('authored locomotion failed',clip,err);return false}}
+  function updateAuthoredLocomotion(rig,moving,sprinting){if(!hasAuthoredLocomotion(rig))return false;const clip=desiredAuthoredLocomotion(moving,sprinting),speed=authoredLocomotionSpeed(clip);return startAuthoredLocomotion(rig,clip,speed)}
+  function firstPersonAuthoredWeaponCfg(){return MODEL_CONFIG.characters?.[selectedCharacter]?.firstPersonAuthoredWeaponPose||{}}
+  function firstPersonUsesMixamoWeaponPose(){const c=firstPersonAuthoredWeaponCfg();return selectedCharacter==='player_ch15'&&c.enabled===true&&c.useIK===false}
+  function desiredFirstPersonAuthoredClip(moving,sprinting,action){const c=firstPersonAuthoredWeaponCfg(),w=getActiveWeapon();if(!w)return authoredLocomotionCfg().unarmedIdle||'unarmed_idle';const pistol=authoredWeaponSet(w.id)==='pistol';if(action?.kind==='throw_grenade'||action?.kind==='use_medkit'||action?.kind==='use_bandage')return pistol?(c.pistolIdleClip||'pistol_idle'):(c.idleClip||'rifle_idle');if(pistol){if(sprinting)return c.pistolRunClip||'pistol_run';if(aimHeld&&!moving)return c.pistolAimClip||'pistol_aim_idle';if(moving)return c.pistolWalkClip||'pistol_walk';return c.pistolIdleClip||'pistol_idle'}if(sprinting)return c.useHighReadySprint?(c.sprintClip||'rifle_sprint'):(c.runClip||'rifle_run');if(aimHeld&&!moving)return c.aimClip||'rifle_aim_idle';if(moving)return c.walkClip||'rifle_walk';return c.idleClip||'rifle_idle'}
+  function startFirstPersonAuthoredPose(rig,moving,sprinting,action){if(!firstPersonUsesMixamoWeaponPose()||!rig)return false;const clip=desiredFirstPersonAuthoredClip(moving,sprinting,action),speed=authoredLocomotionSpeed(clip);return startAuthoredLocomotion(rig,clip,speed)}
+  function applyMixamoWristCorrection(){if(!firstPersonUsesMixamoWeaponPose()||!fpRig?.skeleton||!fpRig?.skinMesh)return;const id=getActiveWeapon()?.id||'ak74',cfg=MODEL_CONFIG.weapons?.[id]?.mixamoFp?.wristCorrection||firstPersonAuthoredWeaponCfg().wristCorrection||{};const apply=(name,v)=>{if(!Array.isArray(v)||v.length<3)return;const b=boneByName(fpRig,name);if(!b)return;try{const q=b.getRotationQuaternion(BABYLON.Space.LOCAL,fpRig.skinMesh);if(!q)return;const d=BABYLON.Quaternion.FromEulerAngles(Number(v[0]||0),Number(v[1]||0),Number(v[2]||0));b.setRotationQuaternion(q.multiply(d),BABYLON.Space.LOCAL,fpRig.skinMesh)}catch{}};apply('Hand_R',cfg.right);apply('Hand_L',cfg.left)}
+  function animateRigLegs(rig,amount,cycle){if(!rig?.skeleton)return;const swing=Math.sin(cycle)*amount,kneeL=Math.max(0,-Math.sin(cycle))*amount*.72,kneeR=Math.max(0,Math.sin(cycle))*amount*.72;setBoneEuler(boneByName(rig,'UpperLeg_L'),swing,0,0);setBoneEuler(boneByName(rig,'UpperLeg_R'),-swing,0,0);setBoneEuler(boneByName(rig,'LowerLeg_L'),kneeL,0,0);setBoneEuler(boneByName(rig,'LowerLeg_R'),kneeR,0,0);setBoneEuler(boneByName(rig,'Foot_L'),-swing*.18,0,0);setBoneEuler(boneByName(rig,'Foot_R'),swing*.18,0,0)}
+  function applyWorldWeaponPose(rig,id){if(!rig?.skeleton)return;const cat=['makarov','glock17','pistol1911'].includes(id)?'pistol':['pump12','saiga12'].includes(id)?'shotgun':'rifle',poses={rifle:{ur:[.295,-.762,-.185],lr:[-.263,-1.576,.263],ul:[-.076,1.167,.095],ll:[-.071,.500,.004]},pistol:{ur:[.196,-.863,-.163],lr:[-.259,-1.456,.255],ul:[.137,.946,.170],ll:[-.229,1.339,-.216]},shotgun:{ur:[.309,-.750,-.206],lr:[-.239,-1.561,.238],ul:[-.093,1.435,-.017],ll:[.134,-.093,.161]}}[cat];setBoneEuler(boneByName(rig,'UpperArm_R'),...poses.ur);setBoneEuler(boneByName(rig,'LowerArm_R'),...poses.lr);setBoneEuler(boneByName(rig,'UpperArm_L'),...poses.ul);setBoneEuler(boneByName(rig,'LowerArm_L'),...poses.ll)}
+  function applyLocalBodyArms(rig,moving,sprinting,cycle){if(!rig?.skeleton)return;const swing=moving?Math.sin(cycle)*(sprinting?.20:.10):0,down=sprinting?.13:.04;setBoneEuler(boneByName(rig,'UpperArm_R'),.08+swing,0,-.18-down);setBoneEuler(boneByName(rig,'LowerArm_R'),-.18,0,.08);setBoneEuler(boneByName(rig,'Hand_R'),0,0,.04);setBoneEuler(boneByName(rig,'UpperArm_L'),.08-swing,0,.18+down);setBoneEuler(boneByName(rig,'LowerArm_L'),-.18,0,-.08);setBoneEuler(boneByName(rig,'Hand_L'),0,0,-.04)}
+  function animatePlayerLocomotion(rig,dt,moving,sprinting,advance=true){if(!rig?.skeleton)return;if(advance){locomotionMoveBlend+=(Number(moving)-locomotionMoveBlend)*Math.min(1,dt*8);locomotionSprintBlend+=(Number(sprinting)-locomotionSprintBlend)*Math.min(1,dt*7);const pace=2+locomotionMoveBlend*(4.7+locomotionSprintBlend*4.0);characterCycle+=dt*pace;locomotionLean+=(locomotionSprintBlend*.16-locomotionLean)*Math.min(1,dt*7)}const stride=locomotionMoveBlend*(.30+locomotionSprintBlend*.30),bob=locomotionMoveBlend*Math.abs(Math.sin(characterCycle*2))*(.010+locomotionSprintBlend*.012),side=Math.sin(characterCycle)*locomotionMoveBlend*(.025+locomotionSprintBlend*.018);animateRigLegs(rig,stride,characterCycle);setBoneEuler(boneByName(rig,'Hips'),locomotionLean*.20,0,-side*.6);setBoneEuler(boneByName(rig,'Spine'),locomotionLean*.34,side*.30,0);setBoneEuler(boneByName(rig,'Chest'),locomotionLean*.36,-side*.42,0);setBoneEuler(boneByName(rig,'Neck'),-locomotionLean*.15,0,0);rig.root.position.y=playerBody.position.y+(playableBodyConfig().rootYOffset||0)+bob;applyLocalBodyArms(rig,moving,sprinting,characterCycle)}
+  function syncRigToPlayer(rig,yaw,back=0){if(!rig?.root||!playerBody)return;rig.root.position.x=playerBody.position.x-Math.sin(yaw)*back;rig.root.position.z=playerBody.position.z-Math.cos(yaw)*back;rig.root.rotation.y=yaw+(playableBodyConfig().yawOffset||0)}
+  function syncPlayerCharacter(dt,moving,sprinting){if(!playerWorldRig?.root||!playerBody)return;const cfg=playableBodyConfig(),yaw=currentCamera?.rotation.y||0;syncRigToPlayer(playerWorldRig,yaw,cfg.rootBackOffset||0);if(hasAuthoredLocomotion(playerWorldRig)){playerWorldRig.root.position.y=playerBody.position.y+(cfg.rootYOffset||0);updateAuthoredLocomotion(playerWorldRig,moving,sprinting);if(playerFpBodyRig?.root){syncRigToPlayer(playerFpBodyRig,yaw,0);playerFpBodyRig.root.position.y=playerBody.position.y+(cfg.rootYOffset||0);updateAuthoredLocomotion(playerFpBodyRig,moving,sprinting)}return}animatePlayerLocomotion(playerWorldRig,dt,moving,sprinting,true);if(playerFpBodyRig?.root){syncRigToPlayer(playerFpBodyRig,yaw,0);animatePlayerLocomotion(playerFpBodyRig,dt,moving,sprinting,false)}}
+
+
+  // ---------- FIRST-PERSON ACTION / ANIMATION SYSTEM ----------
+  const FP_BONES=['UpperArm_L','LowerArm_L','Hand_L','UpperArm_R','LowerArm_R','Hand_R'];
+  const zero3=()=>[0,0,0];
+  const arr3=v=>Array.isArray(v)?[Number(v[0]||0),Number(v[1]||0),Number(v[2]||0)]:[0,0,0];
+  const add3=(a,b,scale=1)=>{a=arr3(a);b=arr3(b);return[a[0]+b[0]*scale,a[1]+b[1]*scale,a[2]+b[2]*scale]};
+  const lerp3=(a,b,t)=>{a=arr3(a);b=arr3(b);return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t]};
+  const smooth01=t=>{t=clamp(t,0,1);return t*t*(3-2*t)};
+  function animationGroupsOf(target){return target?.result?.animationGroups||target?.metadata?.deadhaulAnimationGroups||target?.root?.metadata?.deadhaulAnimationGroups||[]}
+  function findAnimationGroup(target,name){if(!name)return null;const q=String(name).toLowerCase();return animationGroupsOf(target).find(g=>(g.name||'').toLowerCase()===q)||null}
+  function playAnimationGroup(target,name,speed=1){const g=findAnimationGroup(target,name);if(!g)return false;try{for(const other of animationGroupsOf(target))if(other!==g)other.stop?.();g.stop();g.start(false,speed,g.from,g.to,false);return true}catch(err){console.warn('animation clip failed',name,err);return false}}
+  function weaponAnimCfg(id,event){return WEAPON_MEDIA.weapons?.[id]?.animation?.[event]||{}}
+  function globalAnimCfg(event){return WEAPON_MEDIA.actions?.[event]||{}}
+  function weaponPoseProfile(id){const inferred=['makarov','glock17','pistol1911'].includes(id)?'pistol':['mp5','vector'].includes(id)?'smg':['pump12','saiga12'].includes(id)?'shotgun':['mosin','r700'].includes(id)?'bolt':'rifle';return FP_ANIM.weaponProfiles?.[id]?.hold||inferred}
+  function cacheWeaponPartBases(root){weaponPartBases=new Map();for(const m of root?.getChildMeshes?.()||[]){const n=(m.name||'').toLowerCase();if(/mag_|pump_|receiver_|bolt_|slide_/.test(n))weaponPartBases.set(m.uniqueId,{mesh:m,pos:m.position.clone(),rot:m.rotation.clone(),scale:m.scaling.clone(),name:n})}}
+  function resetWeaponPartTransforms(){for(const b of weaponPartBases.values()){if(!b.mesh||isDisposedSafe(b.mesh))continue;b.mesh.position.copyFrom(b.pos);b.mesh.rotation.copyFrom(b.rot);b.mesh.scaling.copyFrom(b.scale)}}
+  function pulseWindow(t,a,b,c,d){if(t<=a||t>=d)return 0;if(t<b)return smooth01((t-a)/(b-a));if(t<=c)return 1;return 1-smooth01((t-c)/(d-c))}
+  function updateWeaponPartAnimation(action){if(!viewWeapon||!weaponPartBases.size)return;resetWeaponPartTransforms();if(!activeFpAction||activeFpAction.id!==getActiveWeapon()?.id)return;const t=action?.t??clamp((performance.now()-activeFpAction.start)/(activeFpAction.duration*1000),0,1),kind=activeFpAction.kind,preset=activeFpAction.preset||'';if(kind==='reload'){const amt=pulseWindow(t,.12,.32,.58,.84);for(const b of weaponPartBases.values())if(/mag_/.test(b.name)){b.mesh.position.y=b.pos.y-.20*amt;b.mesh.position.z=b.pos.z+.035*amt;b.mesh.rotation.x=b.rot.x+.22*amt;b.mesh.rotation.z=b.rot.z-.12*amt}}if(kind==='action'&&preset==='pump_action'){const amt=pulseWindow(t,.08,.38,.40,.78);for(const b of weaponPartBases.values())if(/pump_/.test(b.name))b.mesh.position.z=b.pos.z-.18*amt}if(kind==='action'&&preset==='bolt_action'){const amt=pulseWindow(t,.10,.36,.46,.78);for(const b of weaponPartBases.values())if(/bolt_|receiver_/.test(b.name)){b.mesh.position.z=b.pos.z-.055*amt;b.mesh.rotation.z=b.rot.z+.08*amt}}}
+
+  function holdPoseFor(id){return FP_ANIM.holds?.[weaponPoseProfile(id)]||FP_ANIM.holds?.rifle||{root:{position:[0,0,0],rotation:[0,0,0]},bones:{}}}
+  function resetFpBones(){if(!fpRig?.skeleton)return;for(const n of FP_BONES)setBoneEuler(boneByName(fpRig,n),0,0,0)}
+  function startFpAction(kind,duration,id=null,opts={}){if(!fpRig)return null;const cfg=id?weaponAnimCfg(id,kind):globalAnimCfg(kind),armsClip=cfg.armsClip||cfg.clip||'',weaponClip=cfg.weaponClip||'';const authoredArms=playAnimationGroup(fpRig,armsClip,cfg.speed||1),authoredWeapon=playAnimationGroup(viewWeapon,weaponClip,cfg.speed||1);let preset=opts.preset||cfg.preset||kind;if(id&&kind==='reload')preset=FP_ANIM.weaponProfiles?.[id]?.reload||preset;if(id&&kind==='action')preset=FP_ANIM.weaponProfiles?.[id]?.action||preset;activeFpAction={kind,id,start:performance.now(),duration:Math.max(.05,duration||cfg.duration||1),preset,authoredArms,authoredWeapon};return activeFpAction}
+  function stopFpAction(){activeFpAction=null}
+  function sampleActionFrames(name,t){const frames=FP_ANIM.actions?.[name];if(!Array.isArray(frames)||!frames.length)return {rootPos:zero3(),rootRot:zero3(),bones:{}};if(t<=frames[0].t)return {...frames[0],rootPos:arr3(frames[0].rootPos),rootRot:arr3(frames[0].rootRot),bones:frames[0].bones||{}};if(t>=frames[frames.length-1].t){const f=frames[frames.length-1];return {...f,rootPos:arr3(f.rootPos),rootRot:arr3(f.rootRot),bones:f.bones||{}}}let a=frames[0],b=frames[frames.length-1];for(let i=0;i<frames.length-1;i++)if(t>=frames[i].t&&t<=frames[i+1].t){a=frames[i];b=frames[i+1];break}const u=smooth01((t-a.t)/Math.max(.0001,b.t-a.t)),bones={},names=new Set([...Object.keys(a.bones||{}),...Object.keys(b.bones||{})]);for(const n of names)bones[n]=lerp3(a.bones?.[n]||zero3(),b.bones?.[n]||zero3(),u);return {rootPos:lerp3(a.rootPos||zero3(),b.rootPos||zero3(),u),rootRot:lerp3(a.rootRot||zero3(),b.rootRot||zero3(),u),bones}}
+  function actionPose(){if(!activeFpAction)return {rootPos:zero3(),rootRot:zero3(),bones:{},authored:false};const a=activeFpAction,t=clamp((performance.now()-a.start)/(a.duration*1000),0,1),p=sampleActionFrames(a.preset,t);if(t>=1)setTimeout(()=>{if(activeFpAction===a)stopFpAction()},0);return {...p,authored:!!a.authoredArms,t,kind:a.kind,preset:a.preset}}
+  function applyWeaponArmPose(moving,sprinting,action,dt){if(!fpRig?.skeleton)return;const w=getActiveWeapon(),id=w?.id||'ak74';fpAimBlend+=(Number(aimHeld&&!sprinting)-fpAimBlend)*Math.min(1,dt*12);fpSprintBlend+=(Number(sprinting&&!aimHeld)-fpSprintBlend)*Math.min(1,dt*10);if(action?.authored)return;const hold=holdPoseFor(id),adj=FP_ANIM.weaponAdjustments?.[id]||{},sprint=FP_ANIM.stateOffsets?.sprint||{},idleAmp=(hold.idleAmp??.006)*(1-fpAimBlend)*(1-fpSprintBlend),breath=Math.sin(swayTime*.72)*idleAmp,walkBob=moving?Math.sin(swayTime)*idleAmp*.75:0;for(const name of FP_BONES){let r=add3(hold.bones?.[name],adj.bones?.[name]);if(sprint.bones?.[name])r=add3(r,sprint.bones[name],fpSprintBlend);if(action?.bones?.[name])r=add3(r,action.bones[name],1);if(name.startsWith('UpperArm_'))r[0]+=breath*.9+walkBob*.35;if(name.startsWith('LowerArm_'))r[2]+=breath*.45;setBoneEuler(boneByName(fpRig,name),r[0],r[1],r[2])}}
+  async function attachActionProp(model,hand='Hand_L',cfg={}){if(actionProp&&!isDisposedSafe(actionProp)){try{actionProp.dispose(false,true)}catch{}}actionProp=null;if(!fpRig||!currentScene||!model)return null;try{const r=await loadModel(currentScene,model,[0,0,0],{collision:false,pickable:false,scale:1});attachAssetToBone(r,boneByName(fpRig,hand),fpRig.skinMesh||fpRig.root,cfg);for(const m of r.getChildMeshes?.()||[]){m.renderingGroupId=2;m.alwaysSelectAsActiveMesh=true;m.metadata={...(m.metadata||{}),ignoreBullet:true}}actionProp=r;return r}catch(err){console.warn('action prop failed',model,err);return null}}
+  function setViewWeaponVisible(on){if(!viewWeapon||isDisposedSafe(viewWeapon))return;try{viewWeapon.setEnabled(!!on)}catch{}for(const m of viewWeapon.getChildMeshes?.()||[]){m.isVisible=!!on;m.visibility=on?1:0}}
+  function clearActionProp(){if(actionProp&&!isDisposedSafe(actionProp)){try{actionProp.dispose(false,true)}catch{}}actionProp=null}
+  function medicalModel(id){return {bandage:'loot_bandage',medkit:'loot_medkit',morphine:'loot_morphine',splint:'loot_bandage',antibiotic:'loot_medkit',blood_bag:'loot_medkit'}[id]||'loot_medkit'}
+  function medicalDuration(id){return {bandage:2.0,medkit:3.0,morphine:1.5,splint:2.6,antibiotic:1.8,blood_bag:3.4}[id]||2.2}
+  async function performMedicalUse(index,id,heal){if(actionBusy||reloading||sceneMode!=='raid')return;const item=C[id];if(!item)return;if(health>=100){toast('HEALTH ALREADY FULL');return}closePanel('inventoryPanel');actionBusy=true;fireHeld=false;aimHeld=false;setViewWeaponVisible(false);const duration=medicalDuration(id),kind=id==='bandage'?'use_bandage':'use_medkit';await attachActionProp(medicalModel(id),'Hand_L',{position:[0,.01,.02],rotation:[0,0,0],scale:.65});startFpAction(kind,duration,null);toast('USING '+item.name.toUpperCase(),Math.round(duration*1000));setTimeout(()=>{if(playerDead){actionBusy=false;clearActionProp();setViewWeaponVisible(true);return}const idx=fieldItems.indexOf(id);if(idx>=0)fieldItems.splice(idx,1);health=Math.min(100,health+heal);recalcWeight();updateVitals();actionBusy=false;clearActionProp();setViewWeaponVisible(true);toast(item.name.toUpperCase()+' USED')},duration*1000)}
+  function grenadeRef(){for(const [name,arr] of [['rig',fieldRigItems],['pockets',fieldPocketItems],['backpack',fieldItems]]){const index=arr.findIndex(id=>id==='frag_grenade');if(index>=0)return{name,arr,index}}return null}
+  function grenadeIndex(){const r=grenadeRef();return r?r.index:-1}
+  async function throwGrenade(){if(actionBusy||reloading||playerDead||sceneMode!=='raid')return;const grenade=grenadeRef();if(!grenade){toast('NO FRAG GRENADE');return}actionBusy=true;fireHeld=false;aimHeld=false;setViewWeaponVisible(false);await attachActionProp('frag_grenade','Hand_R',{position:[0,0,.02],rotation:[0,0,0],scale:.7});const duration=.82;startFpAction('throw_grenade',duration,null);toast('FRAG OUT');setTimeout(()=>{const g=grenadeRef();if(g){g.arr.splice(g.index,1);recalcWeight()}const origin=currentCamera.position.add(currentCamera.getForwardRay().direction.scale(.65)).add(new BABYLON.Vector3(0,-.1,0)),vel=currentCamera.getForwardRay().direction.scale(12).add(new BABYLON.Vector3(0,4.2,0));spawnThrownGrenade(origin,vel);clearActionProp()},430);setTimeout(()=>{actionBusy=false;setViewWeaponVisible(true)},duration*1000)}
+  function spawnThrownGrenade(origin,vel){loadModel(currentScene,'frag_grenade',[origin.x,origin.y,origin.z],{collision:false,pickable:false,scale:.8}).then(root=>{grenades.push({root,pos:origin.clone(),vel:vel.clone(),life:3.4,bounces:0})})}
+  function grenadeStep(dt){if(sceneMode!=='raid'||!currentScene)return;for(let i=grenades.length-1;i>=0;i--){const g=grenades[i];g.life-=dt;if(g.life<=0){explodeGrenade(g.pos);g.root?.dispose();grenades.splice(i,1);continue}const next=g.pos.add(g.vel.scale(dt)),delta=next.subtract(g.pos),dist=delta.length();let hit=null;if(dist>.0001){hit=currentScene.pickWithRay(new BABYLON.Ray(g.pos,delta.normalize(),dist),m=>m?.isPickable&&!m.metadata?.ignoreBullet&&!m.metadata?.enemyPart&&!m.metadata?.playerTarget)}if(hit?.hit&&hit.pickedPoint){const n=hit.getNormal?.(true)||new BABYLON.Vector3(0,1,0);g.pos.copyFrom(hit.pickedPoint.add(n.scale(.035)));const vn=BABYLON.Vector3.Dot(g.vel,n);g.vel=g.vel.subtract(n.scale(1.6*vn)).scale(.58);g.bounces++}else g.pos.copyFrom(next);g.vel.y-=9.81*dt;if(g.root&&!isDisposedSafe(g.root)){g.root.position.copyFrom(g.pos);g.root.rotation.x+=dt*8;g.root.rotation.z+=dt*5}}}
+  function explodeGrenade(pos){if(!currentScene)return;const light=new BABYLON.PointLight('grenadeFlash',pos.add(new BABYLON.Vector3(0,1,0)),currentScene);light.diffuse=new BABYLON.Color3(1,.55,.2);light.intensity=12;light.range=14;setTimeout(()=>light.dispose(),90);playNoise(.18,.35,60,600);for(let j=0;j<24;j++){const p=BABYLON.MeshBuilder.CreateSphere('fragSpark',{diameter:rand(.025,.08),segments:3},currentScene);p.position.copyFrom(pos);p.material=mat(currentScene,'fragSparkMat','#c98742','#a34f22');p.isPickable=false;bloodParticles.push({mesh:p,vel:new BABYLON.Vector3(rand(-7,7),rand(1,9),rand(-7,7)),life:rand(.25,.7)})}for(const e of enemies){if(e.dead)continue;const d=BABYLON.Vector3.Distance(e.root.position,pos);if(d<8)damageEnemy(e,Math.max(12,145*(1-d/8)),e.root.position.add(new BABYLON.Vector3(0,1,0)),e.root.position.subtract(pos).normalize())}if(playerBody){const d=BABYLON.Vector3.Distance(playerBody.position,pos);if(d<7)damagePlayer(Math.max(8,120*(1-d/7)),'FRAGMENTATION GRENADE','blast',pos.subtract(playerBody.position).normalize())}}
+
+  function audioCtx(){if(!audioContext)audioContext=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')audioContext.resume?.();return audioContext}
+  async function getAudioBuffer(url){if(!url)return null;if(audioBuffers.has(url))return audioBuffers.get(url);const promise=(async()=>{try{const r=await fetch(url);if(!r.ok)throw new Error('HTTP '+r.status);const ab=await r.arrayBuffer();return await audioCtx().decodeAudioData(ab)}catch(err){console.warn('audio file unavailable',url,err);return null}})();audioBuffers.set(url,promise);return promise}
+  function configuredAudioPath(id,event){const value=WEAPON_MEDIA.weapons?.[id]?.audio?.[event];if(Array.isArray(value))return value.filter(Boolean).length?choose(value.filter(Boolean)):'';return value||''}
+  async function playMp3Event(id,event,opts={}){const url=configuredAudioPath(id,event);if(!url)return false;const buffer=await getAudioBuffer(url);if(!buffer)return false;try{const ctx=audioCtx(),src=ctx.createBufferSource(),gain=ctx.createGain();src.buffer=buffer;gain.gain.value=(WEAPON_MEDIA.weapons?.[id]?.volume??1)*(opts.volume??1);src.connect(gain);if(opts.position&&ctx.createPanner){const p=ctx.createPanner();p.panningModel='HRTF';p.distanceModel='inverse';p.refDistance=2;p.maxDistance=90;p.rolloffFactor=1.1;p.positionX.value=opts.position.x;p.positionY.value=opts.position.y;p.positionZ.value=opts.position.z;gain.connect(p);p.connect(ctx.destination);const l=ctx.listener,cp=currentCamera?.position;if(cp){if(l.positionX){l.positionX.value=cp.x;l.positionY.value=cp.y;l.positionZ.value=cp.z}else l.setPosition(cp.x,cp.y,cp.z)}}else gain.connect(ctx.destination);src.start();return true}catch{return false}}
+  function playWeaponEvent(id,event,opts={}){playMp3Event(id,event,opts).then(ok=>{if(ok)return;if(event==='fire'||event==='suppressed'){const rifle=!['makarov','glock17','pistol1911'].includes(id);playNoise(rifle?.09:.06,rifle?.2:.14,rifle?90:180,rifle?700:1100)}else if(event==='reload')playNoise(.12,.055,350,950);else if(event==='dry')playNoise(.018,.035,700,1600);else if(event==='equip'||event==='action')playNoise(.035,.028,420,1200)})}
+  async function playOneShot(url,volume=.25){const buffer=await getAudioBuffer(url);if(!buffer)return false;try{const ctx=audioCtx(),src=ctx.createBufferSource(),gain=ctx.createGain();src.buffer=buffer;gain.gain.value=volume;src.connect(gain);gain.connect(ctx.destination);src.start();return true}catch{return false}}
+  function playUiClick(confirm=false){playOneShot(confirm?'assets/audio/ui_confirm.wav':'assets/audio/ui_click.wav',confirm?.22:.16)}
+  function footstepStep(dt,moving,sprinting){if(!moving||!grounded||anyPanelOpen()||playerDead){footstepClock=Math.min(footstepClock,.08);return}footstepClock-=dt;if(footstepClock>0)return;lastFootstepSide=1-lastFootstepSide;const metal=sceneMode==='bunker',variants=metal?2:4,n=1+Math.floor(Math.random()*variants);playOneShot(`assets/audio/footstep_${metal?'metal':'concrete'}_${n}.wav`,sprinting?.19:.14);footstepClock=sprinting?.285:.43}
+  function setupCamera(scene,pos,target){const cam=new BABYLON.UniversalCamera('survivorView',new BABYLON.Vector3(...pos),scene);cam.setTarget(new BABYLON.Vector3(...target));cam.attachControl(canvas,true);cam.keysUp=[];cam.keysDown=[];cam.keysLeft=[];cam.keysRight=[];if(cam.inputs?.attached?.keyboard)cam.inputs.remove(cam.inputs.attached.keyboard);cam.checkCollisions=false;cam.applyGravity=false;cam.inertia=0;cam.minZ=.035;cam.fov=fieldFov*Math.PI/180;scene.activeCamera=cam;currentCamera=cam;makePlayerBody(scene,pos);applySensitivity();syncCamera();setupFlashlight(scene);return cam}
+  function setupFlashlight(scene){flashlight=new BABYLON.SpotLight('flashlight',BABYLON.Vector3.Zero(),new BABYLON.Vector3(0,0,1),Math.PI/5,14,scene);flashlight.diffuse=new BABYLON.Color3(.96,.93,.77);flashlight.intensity=0;flashlight.range=38}
+  function syncFlashlight(){if(!flashlight||!currentCamera)return;flashlight.position.copyFrom(currentCamera.position);flashlight.direction=currentCamera.getForwardRay().direction.clone();flashlight.intensity=flashlightOn?4.2:0}
+  function applySensitivity(){const m=currentCamera?.inputs?.attached?.mouse;if(m)m.angularSensibility=3500/mouseSensitivity}
+  function syncCamera(){if(!currentCamera||!playerBody)return;currentCamera.rotation.x=clamp(currentCamera.rotation.x,-1.04,1.08);const cfg=playableBodyConfig(),yaw=currentCamera.rotation.y||0,forward=playableBodyEnabled()?(cfg.cameraForward??DEFAULT_BODY_CAMERA_FORWARD):0,eye=playableBodyEnabled()?(cfg.cameraHeight??PLAYER_EYE_HEIGHT):PLAYER_EYE_HEIGHT;currentCamera.position.set(playerBody.position.x+Math.sin(yaw)*forward,playerBody.position.y+eye,playerBody.position.z+Math.cos(yaw)*forward);syncFlashlight()}
+  function totalEquipmentWeight(){return ['head','hands','armor','front_plate','back_plate','rig','backpack','primary','secondary'].reduce((n,k)=>n+(C[equipment[k]]?.weight||0),0)}
+  function controllerStep(){if(!currentScene||!currentCamera||!playerBody||isDisposedSafe(playerBody)||anyPanelOpen()||playerDead)return;const dt=Math.min(engine.getDeltaTime()/1000,.033);const yaw=currentCamera.rotation.y;const forward=new BABYLON.Vector3(Math.sin(yaw),0,Math.cos(yaw)),right=new BABYLON.Vector3(Math.cos(yaw),0,-Math.sin(yaw));let move=BABYLON.Vector3.Zero();if(keys.w)move.addInPlace(forward);if(keys.s)move.subtractInPlace(forward);if(keys.d)move.addInPlace(right);if(keys.a)move.subtractInPlace(right);const moving=move.lengthSquared()>0;const carried=fieldWeight+totalEquipmentWeight()+(hauledHeavy?35:0);const wantsSprint=keys.shift&&moving&&!aimHeld&&!reloading&&!actionBusy&&!hauledHeavy;
+    // Sprint exhaustion uses hysteresis so stamina near zero cannot alternate sprint/walk every frame.
+    if(stamina<=3){sprintExhausted=true;sprintReleaseSeen=false}
+    if(sprintExhausted&&!keys.shift)sprintReleaseSeen=true;
+    if(sprintExhausted&&sprintReleaseSeen&&stamina>=20){sprintExhausted=false;sprintReleaseSeen=false}
+    const canSprint=wantsSprint&&!sprintExhausted&&stamina>3;actualSprinting=canSprint;
+    const weightPenalty=clamp((carried-20)/55,0,.25);let speed=(hauledHeavy?2.45:(canSprint?SPRINT_SPEED:WALK_SPEED))*(1-weightPenalty);if(moving){move.normalize();const d=move.scale(speed*dt);if(Math.abs(d.x)>.00001)playerBody.moveWithCollisions(new BABYLON.Vector3(d.x,0,0));if(Math.abs(d.z)>.00001)playerBody.moveWithCollisions(new BABYLON.Vector3(0,0,d.z))}
+    if(canSprint)stamina=Math.max(0,stamina-(19+carried*.15)*dt);else stamina=Math.min(100,stamina+(moving?9:15)*dt);
+    if(jumpQueued&&grounded&&stamina>12){verticalVelocity=JUMP_SPEED;grounded=false;stamina=Math.max(0,stamina-11)}jumpQueued=false;verticalVelocity=Math.max(-22,verticalVelocity+GRAVITY*dt);const req=verticalVelocity*dt,before=playerBody.position.y;playerBody.moveWithCollisions(new BABYLON.Vector3(0,req,0));const actual=playerBody.position.y-before;if(req<0&&Math.abs(actual-req)>.004){grounded=true;verticalVelocity=0}else if(req>0&&Math.abs(actual-req)>.004)verticalVelocity=0;else if(req<-.001)grounded=false;syncCamera();syncPlayerCharacter(dt,moving,canSprint);footstepStep(dt,moving,canSprint);updateVitals();updateWeaponView(dt,moving,canSprint)}
+
+
+
+  // ---------- INVENTORY 3D CHARACTER PREVIEW ----------
+  async function rebuildCharacterPreview(){const canvas=$('characterPreviewCanvas');if(!canvas)return;const token=++previewToken;if(!previewEngine){previewEngine=new BABYLON.Engine(canvas,true,{preserveDrawingBuffer:true,stencil:true,alpha:true,adaptToDeviceRatio:true});previewEngine.runRenderLoop(()=>{if(inventoryOpen&&previewScene&&!isDisposedSafe(previewScene))previewScene.render()})}if(previewScene&&!isDisposedSafe(previewScene))previewScene.dispose();const s=new BABYLON.Scene(previewEngine);previewScene=s;s.clearColor=new BABYLON.Color4(.035,.05,.043,1);const cam=new BABYLON.ArcRotateCamera('previewCam',Math.PI/2,Math.PI/2.35,4.6,new BABYLON.Vector3(0,1.05,0),s);cam.lowerRadiusLimit=2.8;cam.upperRadiusLimit=6;cam.wheelDeltaPercentage=.01;cam.attachControl(canvas,true);new BABYLON.HemisphericLight('previewHemi',new BABYLON.Vector3(.3,1,-.2),s).intensity=1.25;const key=new BABYLON.DirectionalLight('previewKey',new BABYLON.Vector3(-.6,-1,.5),s);key.intensity=.8;const cfg=MODEL_CONFIG.characters?.[selectedCharacter]||Object.values(MODEL_CONFIG.characters||{})[0];if(!cfg)return;try{const rig=await loadRiggedModel(s,cfg.file,[0,0,0],{scale:cfg.scale??1,pickable:false,name:'previewRig',boneAliases:cfg.boneAliases||{},singleSkinnedMesh:!!cfg.singleSkinnedMesh});if(token!==previewToken){rig.root.dispose();return}for(const m of rig.meshes||[]){m.isVisible=true;m.visibility=1;m.isPickable=false;const n=(m.name||'').toLowerCase();if(n.includes('hand')&&m.material){const hs=MODEL_CONFIG.handStyles?.[equipment.hands]||{},clone=m.material.clone?.((m.material.name||'hand')+'_preview_'+m.uniqueId)||m.material;if(clone.diffuseColor)clone.diffuseColor=color3(hs.gloveColor,'#232b28');m.material=clone}}for(const id of [equipment.head,equipment.armor,equipment.rig,equipment.backpack]){const gc=MODEL_CONFIG.gear?.[id];if(!gc)continue;const gr=await loadModel(s,gc.file,[0,0,0],{collision:false,pickable:false,scale:1});attachAssetToBone(gr,boneByName(rig,gc.bone||'Chest'),rig.skinMesh||rig.root,gc)}const wid=equipment[activeWeaponSlot]||equipment.primary;if(selectedCharacter==='player_ch15'&&hasAuthoredLocomotion(rig)){const previewClip=WEAPONS[wid]?(authoredWeaponSet(wid)==='pistol'?(authoredLocomotionCfg().pistolIdle||'pistol_idle'):(authoredLocomotionCfg().rifleIdle||'rifle_idle')):(authoredLocomotionCfg().unarmedIdle||'unarmed_idle');startAuthoredLocomotion(rig,previewClip,1)}else applyWorldWeaponPose(rig,wid);if(WEAPONS[wid]){const wc=MODEL_CONFIG.weapons?.[wid]?.world||{},gun=await loadModel(s,WEAPONS[wid].model,[0,0,0],{collision:false,pickable:false,scale:1});attachAssetToBone(gun,boneByName(rig,cfg.weaponBone||'Hand_R'),rig.skinMesh||rig.root,wc)}setTimeout(()=>previewEngine?.resize(),0)}catch(err){console.warn('preview failed',err)}}
+  function updateEquipmentPresentation(){const overlay=$('helmetOverlay');if(overlay){overlay.className='helmet-overlay';if(equipment.head&&sceneMode==='raid'){overlay.classList.add('active');const kind=MODEL_CONFIG.gear?.[equipment.head]?.firstPersonOverlay||'ballistic';overlay.classList.add('overlay-'+kind)}}if(inventoryOpen)rebuildCharacterPreview()}
+
+  // ---------- UI PANELS ----------
+  function releasePointer(){suppressPointerSettings=true;document.exitPointerLock?.();setTimeout(()=>suppressPointerSettings=false,80)}
+  function resumePointer(){if(!anyPanelOpen()&&!playerDead){canvas.focus();canvas.requestPointerLock?.()}}
+  function closePanel(id){$(id)?.classList.add('hidden');if(id==='settingsPanel')settingsOpen=false;if(id==='inventoryPanel')inventoryOpen=false;if(id==='lootPanel'){lootOpen=false;lootSource=null}if(id==='mapPanel')mapOpen=false;if(id==='stashPanel')stashOpen=false;if(id==='customizationPanel')customizationOpen=false;resumePointer()}
+  function openSettings(){if(settingsOpen)return;closeAllGameplayPanels();settingsOpen=true;$('settingsPanel').classList.remove('hidden');releasePointer()}
+  function closeAllGameplayPanels(){if(inventoryOpen){$('inventoryPanel').classList.add('hidden');inventoryOpen=false}if(lootOpen){$('lootPanel').classList.add('hidden');lootOpen=false;lootSource=null}if(mapOpen){$('mapPanel').classList.add('hidden');mapOpen=false}if(stashOpen){$('stashPanel')?.classList.add('hidden');stashOpen=false}if(customizationOpen){$('customizationPanel')?.classList.add('hidden');customizationOpen=false}}
+  function toggleInventory(){if(actionBusy){toast('ACTION IN PROGRESS');return}if(sceneMode==='bunker'){if(stashOpen){closePanel('stashPanel');return}openStashPanel();return}if(sceneMode!=='raid')return;if(inventoryOpen){closePanel('inventoryPanel');return}closeAllGameplayPanels();inventoryOpen=true;renderInventory();$('inventoryPanel').classList.remove('hidden');releasePointer();setTimeout(()=>{previewEngine?.resize();rebuildCharacterPreview()},0)}
+  function openMapPanel(){if(sceneMode!=='bunker')return;closeAllGameplayPanels();mapOpen=true;renderMaps();$('mapPanel').classList.remove('hidden');releasePointer()}
+  function openLoot(source){if(!source||playerDead)return;closeAllGameplayPanels();lootSource=source;lootOpen=true;renderLoot();$('lootPanel').classList.remove('hidden');releasePointer()}
+  function renderMaps(){$('mapCards').innerHTML=Object.entries(MAPS).map(([id,m])=>`<button class="map-card ${selectedMapId===id?'selected':''}" data-map="${id}"><div class="map-art"></div><div class="map-info"><span>${m.code}</span><h3>${m.name}</h3><p>${m.description}</p></div><div class="map-meta"><div><span>THREAT</span><b>${m.difficulty}</b></div><div><span>PRIMARY LOOT</span><b>${m.loot}</b></div></div></button>`).join('');document.querySelectorAll('.map-card').forEach(b=>b.addEventListener('click',()=>{selectedMapId=b.dataset.map;$('selectedMapName').textContent=MAPS[selectedMapId].name.toUpperCase();renderMaps()}));$('selectedMapName').textContent=MAPS[selectedMapId].name.toUpperCase()}
+  function itemIcon(id){return `assets/icons/${C[id]?id:'unknown'}.svg`}
+  function gearSlotForItem(id){if(WEAPONS[id])return WEAPONS[id].slot;const meta=gearMeta(id);if(meta.type==='plate')return plateSlotForItem(id)||'front_plate';if(meta.type==='softArmor'||meta.type==='plateCarrier')return'armor';if(meta.type==='helmet')return'head';if(['tactical_gloves','work_gloves','winter_gloves'].includes(id))return'hands';if(meta.type==='rig')return'rig';if(meta.type==='backpack')return'backpack';return null}
+  function renderEquipmentSlotActions(){for(const slot of ['head','hands','armor','front_plate','back_plate','rig','backpack','primary','secondary']){const boxEl=document.querySelector(`.equip-slot[data-slot="${slot}"]`);if(!boxEl)continue;boxEl.querySelector('.equip-actions')?.remove();if(!equipment[slot])continue;const actions=document.createElement('div');actions.className='equip-actions';actions.innerHTML=`<button type="button" data-unequip-slot="${slot}">UNEQUIP</button>`;boxEl.appendChild(actions)}document.querySelectorAll('[data-unequip-slot]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();unequipRaidSlot(b.dataset.unequipSlot)}))}
+  function fieldContainer(name){return name==='rig'?fieldRigItems:name==='pockets'?fieldPocketItems:fieldItems}
+  function fieldContainerLimit(name){return name==='rig'?rigSlotCount():name==='pockets'?4:backpackSlotCount()}
+  function canMoveToFieldContainer(id,name){const a=fieldContainer(name);if(a.length>=fieldContainerLimit(name))return false;if(name==='rig'&&!canStoreInRig(id))return false;if(name==='pockets'&&!canStoreInPocket(id))return false;return true}
+  function fieldActionLabel(id){const item=C[id]||{};if(item.category==='weapon'||item.category==='gear')return'EQUIP';if(item.category==='medical')return'USE';if(item.category==='ammo')return'LOAD';if(item.category==='magazine')return'INSPECT';if(item.category==='food')return'USE';if(item.category==='throwable')return'THROW';return''}
+  function tacticalItemCell(id,index,container){const item=C[id]||{name:id,rarity:'common',category:'misc',weight:0};const action=fieldActionLabel(id);return `<article class="t-item ${item.rarity||'common'}" draggable="true" data-field-container="${container}" data-field-index="${index}" title="Drag between rig, pockets and backpack"><img src="${itemIcon(id)}" alt=""><div><span>${(item.category||'ITEM').toUpperCase()}</span><b>${item.name}</b><small>${Number(item.weight||0).toFixed(2)} KG</small></div><div class="t-item-actions">${action?`<button data-field-use="${container}:${index}">${action}</button>`:''}<button class="danger-lite" data-field-drop="${container}:${index}">DROP</button></div></article>`}
+  function renderContainerGrid(elId,items,capacity,container,emptyLabel){const el=$(elId);if(!el)return;const cells=[];for(let i=0;i<capacity;i++)cells.push(i<items.length?tacticalItemCell(items[i],i,container):`<div class="t-empty-cell" data-empty-slot="${i}"><span>${String(i+1).padStart(2,'0')}</span></div>`);el.innerHTML=cells.join('');el.dataset.targetContainer=container;el.classList.toggle('is-empty',!items.length);if(!capacity)el.innerHTML=`<div class="empty-grid">${emptyLabel||'NO CONTAINER EQUIPPED'}</div>`}
+  function bindTacticalInventory(){document.querySelectorAll('[data-field-use]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const [c,i]=b.dataset.fieldUse.split(':');useFieldContainerItem(c,Number(i))}));document.querySelectorAll('[data-field-drop]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const [c,i]=b.dataset.fieldDrop.split(':');dropFieldContainerItem(c,Number(i))}));document.querySelectorAll('[data-field-container]').forEach(el=>{el.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/deadhaul-item',JSON.stringify({container:el.dataset.fieldContainer,index:Number(el.dataset.fieldIndex)}));e.dataTransfer.effectAllowed='move'});el.addEventListener('dblclick',()=>{const c=el.dataset.fieldContainer,i=Number(el.dataset.fieldIndex);if(c==='backpack'){const id=fieldItems[i],target=canMoveToFieldContainer(id,'rig')?'rig':canMoveToFieldContainer(id,'pockets')?'pockets':null;if(target)moveFieldItem(c,i,target)}else moveFieldItem(c,i,'backpack')})});document.querySelectorAll('.t-container-grid[data-target-container]').forEach(zone=>{zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over')});zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag-over');try{const d=JSON.parse(e.dataTransfer.getData('text/deadhaul-item'));moveFieldItem(d.container,d.index,zone.dataset.targetContainer)}catch{}})})}
+  function moveFieldItem(from,index,to){if(from===to)return;const a=fieldContainer(from),b=fieldContainer(to),id=a[index];if(!id)return;if(!canMoveToFieldContainer(id,to)){toast(to==='rig'?'ITEM DOES NOT FIT OR RIG IS FULL':to==='pockets'?'POCKETS FULL / ITEM TOO LARGE':'BACKPACK FULL');return}a.splice(index,1);b.push(id);recalcWeight();renderInventory();playUiClick(true)}
+  function useFieldContainerItem(container,index){if(container==='backpack')return useOrEquipItem(index);const a=fieldContainer(container),id=a[index];if(!id)return;if(fieldItems.length>=backpackSlotCount()){toast('BACKPACK NEEDS ONE FREE CELL TO USE / EQUIP');return}a.splice(index,1);fieldItems.push(id);recalcWeight();renderInventory();useOrEquipItem(fieldItems.length-1)}
+  async function dropFieldContainerItem(container,index){const a=fieldContainer(container);if(index<0||index>=a.length)return;const id=a[index],item=C[id];a.splice(index,1);recalcWeight();renderInventory();const f=currentCamera?.getForwardRay().direction||new BABYLON.Vector3(0,0,1),p=playerBody?.position?.clone()||BABYLON.Vector3.Zero();const pos=[p.x+f.x*.95,.18,p.z+f.z*.95];await spawnLoose(currentScene,id,pos,null,item?.category==='weapon'?.8:1);playUiClick(true);toast((item?.name||id).toUpperCase()+' DROPPED')}
+  function renderInventory(){for(const slot of ['head','hands','armor','front_plate','back_plate','rig','backpack','primary','secondary']){const el=$('equip-'+slot);if(el)el.textContent=C[equipment[slot]]?.name||'EMPTY'}renderEquipmentSlotActions();const w=getActiveWeapon();$('invWeaponName').textContent=w?C[equipment[activeWeaponSlot]]?.name:'UNARMED';$('invWeaponStats').textContent=w?`${w.ammoLabel} // ${w.mag} RD // ${magazineForWeapon(w.id)?spareMagazineCount(w.id)+' SPARE MAGS':(w.state?.reserve??0)+' RESERVE'}`:'NO WEAPON';$('bagCapacity').textContent=`${fieldWeight.toFixed(1)} / ${bagCapacity()} KG // ${fieldItems.length}/${backpackSlotCount()} CELLS`;if($('rigCapacityText'))$('rigCapacityText').textContent=`${fieldRigItems.length} / ${rigSlotCount()} CELLS // ${C[equipment.rig]?.name||'NO RIG'}`;if($('pocketCapacityText'))$('pocketCapacityText').textContent=`${fieldPocketItems.length} / 4 CELLS`;renderContainerGrid('rigGrid',fieldRigItems,rigSlotCount(),'rig','NO CHEST RIG EQUIPPED');renderContainerGrid('pocketGrid',fieldPocketItems,4,'pockets','POCKETS EMPTY');renderContainerGrid('bagGrid',fieldItems,backpackSlotCount(),'backpack','NO BACKPACK EQUIPPED');bindTacticalInventory();updateEquipmentPresentation()}
+  function itemDescriptor(id){const m=gearMeta(id);if(m.type==='backpack')return `${m.slots||0} CELLS // ${m.capacity} KG`;if(m.type==='rig')return `${m.slots||0} TACTICAL CELLS // NO ARMOR`;if(m.type==='plateCarrier')return `PLATE CARRIER // ${m.storage||0} KG GEAR // FRONT+BACK PLATES`;if(m.type==='plate')return `ARMOR PLATE LVL ${m.level}`;if(m.type==='helmet')return `HEAD PROTECTION LVL ${m.level||1}`;if(isMagazine(id))return `${C[id]?.rounds||0} RD // ${C[id]?.ammo?C[C[id].ammo]?.name||'AMMO':''}`;return ''}
+  function itemCard(id,index,allowEquip=false){const item=C[id]||{name:id,weight:0,rarity:'common',category:'misc'};let action='';if(allowEquip){if(item.category==='weapon'||item.category==='gear')action='EQUIP';else if(item.category==='medical')action='USE';else if(item.category==='ammo')action='LOAD RESERVE';else if(item.category==='food')action='CONSUME';else if(item.category==='throwable')action='THROW'}const desc=itemDescriptor(id);return `<article class="item-card ${item.rarity||'common'} ${item.category==='weapon'?'weapon':''}" ${allowEquip?`data-equip-index="${index}"`:''}><img class="item-thumb" src="${itemIcon(id)}" alt=""><span>${(item.category||item.rarity||'item').toUpperCase()}</span><b>${item.name}</b><small>${Number(item.weight||0).toFixed(2)} KG // $${Number(item.value||0).toLocaleString()}${desc?' // '+desc:''}</small>${allowEquip?`<div class="item-actions">${action?`<button type="button" data-item-action="${index}">${action}</button>`:''}<button type="button" class="danger-lite ${action?'':'wide-action'}" data-drop-index="${index}">DROP</button></div>`:''}</article>`}
+  function renderLoot(){if(!lootSource)return;$('lootSourceName').textContent=lootSource.name;$('lootWeight').textContent=`${fieldWeight.toFixed(1)} / ${bagCapacity()} KG`;$('lootSourceGrid').innerHTML=lootSource.items.length?lootSource.items.map((id,i)=>`<article class="item-card ${C[id]?.rarity||'common'} ${C[id]?.category==='weapon'?'weapon':''}"><img class="item-thumb" src="${itemIcon(id)}" alt=""><span>${(C[id]?.category||'ITEM').toUpperCase()}</span><b>${C[id]?.name||id}</b><small>${(C[id]?.weight||0).toFixed(2)} KG // $${(C[id]?.value||0).toLocaleString()}</small><button data-take="${i}">TAKE</button></article>`).join(''):'<div class="empty-grid">EMPTY</div>';$('lootBagGrid').innerHTML=fieldItems.length?fieldItems.map(id=>itemCard(id,-1,false)).join(''):'<div class="empty-grid">BACKPACK EMPTY</div>';document.querySelectorAll('[data-take]').forEach(b=>b.addEventListener('click',()=>takeLootItem(Number(b.dataset.take))))}
+  function autoStoreFieldItem(id){const item=C[id];if(!item)return false;if(fieldWeight+(item.weight||0)>bagCapacity())return false;if(canStoreInRig(id)&&fieldRigItems.length<rigSlotCount()){fieldRigItems.push(id);return true}if(canStoreInPocket(id)&&fieldPocketItems.length<4){fieldPocketItems.push(id);return true}if(fieldItems.length<backpackSlotCount()){fieldItems.push(id);return true}return false}
+  function takeLootItem(index){if(!lootSource)return;const id=lootSource.items[index],item=C[id];if(!item)return;if(!autoStoreFieldItem(id)){toast('NO AVAILABLE STORAGE');return}recalcWeight();lootSource.items.splice(index,1);playUiClick(true);renderLoot();toast(item.name.toUpperCase()+' SECURED')}
+  function takeAllLoot(){if(!lootSource)return;let took=0;for(let i=lootSource.items.length-1;i>=0;i--){const id=lootSource.items[i];if(autoStoreFieldItem(id)){lootSource.items.splice(i,1);took++}}recalcWeight();renderLoot();if(took){playUiClick(true);toast(`${took} ITEMS SECURED`)}else toast('NO SPACE AVAILABLE')}
+  async function refreshGearAfterChange(slot){if(playerWorldRig&&currentScene)await attachConfiguredGear(currentScene,playerWorldRig);if(slot==='hands'&&sceneMode==='raid'){if(fpRig){disposeFirstPersonIK();try{fpRig.root.dispose(false,true)}catch{}fpRig=null}await loadViewWeapon()}updateEquipmentPresentation()}
+  function useOrEquipItem(index){const id=fieldItems[index],item=C[id];if(!item)return;if(item.category==='weapon')return equipFromBag(index);if(item.category==='gear'){let slot=gearSlotForItem(id);if(!slot)return;if(isArmorPlate(id)&&!isPlateCarrier(equipment.armor)){toast('INSTALL A PLATE CARRIER FIRST');return}if(isArmorPlate(id)&&equipment.front_plate&&equipment.back_plate){toast('FRONT/BACK PLATES FULL — UNEQUIP ONE FIRST');return}const old=equipment[slot];let newCap=capacityWith(slot,id);let newWeight=fieldWeight-(item.weight||0)+(old?(C[old]?.weight||0):0);if(slot==='armor'&&isPlateCarrier(equipment.armor)&&(equipment.front_plate||equipment.back_plate)){toast('REMOVE FRONT/BACK PLATES BEFORE CHANGING ARMOR');return}if(slot==='backpack'||slot==='rig'||slot==='armor'){newCap=capacityWith(slot,id);if(newWeight>newCap){toast('MOVE ITEMS BEFORE CHANGING STORAGE GEAR');return}if(slot==='rig'&&fieldRigItems.length>rigSlotCount(id)){toast('EMPTY RIG CELLS BEFORE EQUIPPING A SMALLER RIG');return}if(slot==='backpack'&&fieldItems.length>backpackSlotCount(id)){toast('EMPTY BACKPACK CELLS BEFORE EQUIPPING A SMALLER PACK');return}}equipment[slot]=id;fieldItems.splice(index,1);if(old)fieldItems.push(old);recalcWeight();renderInventory();refreshGearAfterChange(slot);toast(item.name.toUpperCase()+' EQUIPPED');return}if(item.category==='medical'){const heal={bandage:12,medkit:42,morphine:24,splint:18,antibiotic:10,blood_bag:55}[id]||10;performMedicalUse(index,id,heal);return}if(item.category==='throwable'){closePanel('inventoryPanel');throwGrenade();return}if(item.category==='food'){stamina=Math.min(100,stamina+({water_bottle:35,canned_beans:28,energy_bar:24,coffee:18}[id]||20));fieldItems.splice(index,1);recalcWeight();renderInventory();toast(item.name.toUpperCase()+' CONSUMED');return}if(item.category==='ammo'){let loaded=false;for(const slot of ['primary','secondary']){const wid=equipment[slot],w=WEAPONS[wid];if(w?.ammo===id){initWeaponState(wid);const rounds={ammo_9x18:30,ammo_9x19:30,ammo_45:24,ammo_545:30,ammo_556:30,ammo_762x39:30,ammo_762x54:20,ammo_12g:12,ammo_308:20}[id]||20;weaponStates[wid].reserve+=rounds;loaded=true}}if(!loaded){toast('NO COMPATIBLE WEAPON EQUIPPED');return}fieldItems.splice(index,1);recalcWeight();renderInventory();updateWeaponHud();toast('AMMUNITION ADDED TO RESERVE')}}
+  function equipFromBag(index){const id=fieldItems[index],w=WEAPONS[id];if(!w)return;const slot=w.slot,old=equipment[slot];equipment[slot]=id;fieldItems.splice(index,1);if(old&&C[old])fieldItems.push(old);recalcWeight();initWeaponState(id);activeWeaponSlot=slot;loadViewWeapon();renderInventory();refreshGearAfterChange(slot);toast(C[id].name.toUpperCase()+' EQUIPPED')}
+  function unequipRaidSlot(slot){if(sceneMode!=='raid')return;const id=equipment[slot];if(!id)return;const item=C[id];if(slot==='armor'&&isPlateCarrier(id)&&(equipment.front_plate||equipment.back_plate)){toast('REMOVE FRONT/BACK PLATES FIRST');return}if(slot==='rig'&&fieldRigItems.length){toast('EMPTY CHEST RIG FIRST');return}if(slot==='backpack'&&fieldItems.length){toast('EMPTY BACKPACK FIRST');return}let newWeight=fieldWeight+(item?.weight||0),newCap=capacityWith(slot,null);if(newWeight>newCap){toast(slot==='backpack'||slot==='rig'||slot==='armor'?'MOVE ITEMS BEFORE REMOVING STORAGE GEAR':'BACKPACK OVERWEIGHT');return}fieldItems.push(id);equipment[slot]=null;recalcWeight();if(slot===activeWeaponSlot){activeWeaponSlot=WEAPONS[equipment.primary]?'primary':WEAPONS[equipment.secondary]?'secondary':'primary';loadViewWeapon()}renderInventory();refreshGearAfterChange(slot);toast((item?.name||id).toUpperCase()+' REMOVED')}
+  async function dropFieldItem(index){if(sceneMode!=='raid'||index<0||index>=fieldItems.length)return;const id=fieldItems[index],item=C[id];fieldItems.splice(index,1);recalcWeight();renderInventory();const f=currentCamera?.getForwardRay().direction||new BABYLON.Vector3(0,0,1),p=playerBody?.position?.clone()||BABYLON.Vector3.Zero();const pos=[p.x+f.x*.95,.18,p.z+f.z*.95];await spawnLoose(currentScene,id,pos,null,item?.category==='weapon'?.8:1);playUiClick(true);toast((item?.name||id).toUpperCase()+' DROPPED')}
+
+
+  // ---------- SAFEHOUSE STASH / PREP / DISPLAY ----------
+  function currentStash(){return Array.isArray(playerData?.inventory)?playerData.inventory:[]}
+  function preparedWeight(){return allPreparedItems().reduce((n,id)=>n+(C[id]?.weight||0),0)}
+  function displayEntryForRecord(rec){return safehouseConfig.display?.find(x=>String(x.recordId)===String(rec.id))}
+  function sanitizeSafehouseDisplay(){const ids=new Set(currentStash().map(x=>String(x.id)));safehouseConfig.display=(safehouseConfig.display||[]).filter(x=>ids.has(String(x.recordId))).slice(0,8);saveSafehouseConfig()}
+  function stashActionLabel(id){if(isArmorPlate(id))return 'INSTALL PLATE';if(gearSlotForItem(id))return'EQUIP';if(canStoreInRig(id)&&equipment.rig)return'PACK TACTICAL';return'PACK'}
+  function stashCard(rec){const id=rec.item_id,item=C[id]||{name:rec.item_name||id,weight:rec.weight||0,value:rec.value||0,rarity:rec.rarity||'common',category:'misc'},shown=!!displayEntryForRecord(rec);return `<article class="item-card ${item.rarity||'common'} ${item.category==='weapon'?'weapon':''} ${shown?'displayed':''}"><img class="item-thumb" src="${itemIcon(id)}" alt=""><span>${(item.category||item.rarity||'item').toUpperCase()}</span><b>${item.name}</b><small>${Number(item.weight||0).toFixed(2)} KG // $${Number(item.value||0).toLocaleString()}</small><div class="item-actions"><button data-stash-primary="${rec.id}">${stashActionLabel(id)}</button><button class="display-action" data-stash-display="${rec.id}">${shown?'REMOVE DISPLAY':'DISPLAY'}</button></div></article>`}
+  function preparedCell(id,index,container){const item=C[id]||{name:id,weight:0,rarity:'common',category:'misc'};return `<article class="t-item ${item.rarity||'common'}"><img src="${itemIcon(id)}" alt=""><div><span>${(item.category||'ITEM').toUpperCase()}</span><b>${item.name}</b><small>${Number(item.weight||0).toFixed(2)} KG</small></div><div class="t-item-actions"><button class="wide-action" data-unpack-container="${container}" data-unpack-index="${index}">STASH</button></div></article>`}
+  function preparedGridHtml(items,limit,container){const cells=[];for(let i=0;i<limit;i++)cells.push(i<items.length?preparedCell(items[i],i,container):`<div class="t-empty-cell"><span>${String(i+1).padStart(2,'0')}</span></div>`);return cells.join('')||'<div class="empty-grid">NO STORAGE</div>'}
+  function renderStashPanel(){sanitizeSafehouseDisplay();const inv=currentStash();$('stashCount').textContent=`${inv.length} ITEMS`;$('stashGridGame').innerHTML=inv.length?inv.map(stashCard).join(''):'<div class="empty-grid">STASH EMPTY // EXTRACT WITH LOOT TO FILL IT</div>';const slots=[['head','HEAD'],['hands','HANDS'],['armor','CARRIER / ARMOR'],['front_plate','FRONT PLATE'],['back_plate','BACK PLATE'],['rig','CHEST RIG'],['backpack','BACKPACK'],['primary','PRIMARY'],['secondary','SIDEARM']];$('stashEquipment').innerHTML=slots.map(([slot,label])=>`<div class="stash-equip-row"><span>${label}</span><b>${C[equipment[slot]]?.name||'EMPTY'}</b><button data-stash-unequip="${slot}" ${equipment[slot]?'':'disabled'}>UNEQUIP</button></div>`).join('');preparedBag();preparedRig();preparedPockets();$('preparedWeight').textContent=`${preparedWeight().toFixed(1)} / ${bagCapacity()} KG`;$('preparedRigMeta').textContent=`${preparedRig().length}/${rigSlotCount()} CELLS // ${C[equipment.rig]?.name||'NO RIG'}`;$('preparedRigGrid').innerHTML=preparedGridHtml(preparedRig(),rigSlotCount(),'rig');$('preparedPocketMeta').textContent=`${preparedPockets().length}/4 CELLS`;$('preparedPocketGrid').innerHTML=preparedGridHtml(preparedPockets(),4,'pockets');$('preparedBagMeta').textContent=`${preparedBag().length}/${backpackSlotCount()} CELLS // ${C[equipment.backpack]?.name||'NO BACKPACK'}`;$('preparedGrid').innerHTML=preparedGridHtml(preparedBag(),backpackSlotCount(),'backpack');renderDisplaySlots();document.querySelectorAll('[data-stash-primary]').forEach(b=>b.addEventListener('click',()=>stashPrimaryAction(b.dataset.stashPrimary)));document.querySelectorAll('[data-stash-display]').forEach(b=>b.addEventListener('click',()=>toggleDisplayRecord(b.dataset.stashDisplay)));document.querySelectorAll('[data-stash-unequip]').forEach(b=>b.addEventListener('click',()=>unequipPersistent(b.dataset.stashUnequip)));document.querySelectorAll('[data-unpack-index]').forEach(b=>b.addEventListener('click',()=>unpackPrepared(b.dataset.unpackContainer,Number(b.dataset.unpackIndex))))}
+  function renderDisplaySlots(){const slots=$('displaySlots');if(!slots)return;const byId=new Map(currentStash().map(x=>[String(x.id),x]));const display=safehouseConfig.display||[];slots.innerHTML=Array.from({length:8},(_,i)=>{const d=display[i],r=d&&byId.get(String(d.recordId));if(!r)return'<div class="display-slot empty">EMPTY</div>';return `<div class="display-slot"><img src="${itemIcon(r.item_id)}" alt=""><b>${C[r.item_id]?.name||r.item_name||r.item_id}</b></div>`}).join('')}
+  async function reloadStashData(){playerData=await A.getPlayerData();return playerData}
+  async function openStashPanel(){if(sceneMode!=='bunker')return;closeAllGameplayPanels();stashOpen=true;try{await reloadStashData();equipment={...(playerData.loadout||equipment)};preparedBag();preparedRig();preparedPockets()}catch(err){console.warn('stash refresh failed',err)}renderStashPanel();$('stashPanel').classList.remove('hidden');releasePointer()}
+  function labelForSelect(id,value){const el=$(id);return el?.querySelector?.(`option[value="${value}"]`)?.textContent||String(value||'').toUpperCase()}
+  function renderCustomizationPanel(){const theme=safehouseConfig.theme||'concrete',floor=safehouseConfig.floor||'sealed',lamp=safehouseConfig.lampColor||'white',decor=safehouseConfig.decor||'survival',clutter=safehouseConfig.clutter||'normal',light=Number(safehouseConfig.light??.82);if($('safehouseTheme'))$('safehouseTheme').value=theme;if($('safehouseFloor'))$('safehouseFloor').value=floor;if($('safehouseLampColor'))$('safehouseLampColor').value=lamp;if($('safehouseDecor'))$('safehouseDecor').value=decor;if($('safehouseClutter'))$('safehouseClutter').value=clutter;if($('safehouseLight'))$('safehouseLight').value=light;if($('safehouseLightValue'))$('safehouseLightValue').textContent=light.toFixed(2);if($('safehouseProfileName'))$('safehouseProfileName').textContent='NODE 17 // '+labelForSelect('safehouseDecor',decor);if($('customWallReadout'))$('customWallReadout').textContent=labelForSelect('safehouseTheme',theme);if($('customFloorReadout'))$('customFloorReadout').textContent=labelForSelect('safehouseFloor',floor);if($('customLightReadout'))$('customLightReadout').textContent=labelForSelect('safehouseLampColor',lamp)+' // '+light.toFixed(2);if($('customDecorReadout'))$('customDecorReadout').textContent=labelForSelect('safehouseDecor',decor)+' // '+clutter.toUpperCase()}
+  function openCustomizationPanel(){if(sceneMode!=='bunker')return;closeAllGameplayPanels();customizationOpen=true;renderCustomizationPanel();$('customizationPanel')?.classList.remove('hidden');releasePointer();playUiClick(true)}
+  function removeLocalStashRecord(id){const idx=currentStash().findIndex(x=>String(x.id)===String(id));if(idx>=0)return currentStash().splice(idx,1)[0];return null}
+  async function stashPrimaryAction(recordId){const rec=currentStash().find(x=>String(x.id)===String(recordId));if(!rec)return;const id=rec.item_id,slot=gearSlotForItem(id);playUiClick();try{if(slot)await equipStashRecord(rec,slot);else await packStashRecord(rec)}catch(err){console.error(err);toast('STASH UPDATE FAILED // '+(err.message||err),3000);await reloadStashData();renderStashPanel()}}
+  async function equipStashRecord(rec,slot){const id=rec.item_id,old=equipment[slot];if(isArmorPlate(id)&&!isPlateCarrier(equipment.armor)){toast('INSTALL A PLATE CARRIER FIRST');return}if(isArmorPlate(id)&&equipment.front_plate&&equipment.back_plate){toast('FRONT/BACK PLATES FULL — UNEQUIP ONE FIRST');return}if(slot==='armor'&&isPlateCarrier(equipment.armor)&&(equipment.front_plate||equipment.back_plate)){toast('REMOVE FRONT/BACK PLATES BEFORE CHANGING ARMOR');return}if(slot==='backpack'||slot==='rig'||slot==='armor'){const cap=capacityWith(slot,id);if(preparedWeight()>cap){toast('PREPARED LOADOUT IS TOO HEAVY FOR THAT STORAGE SETUP');return}if(slot==='rig'&&preparedRig().length>rigSlotCount(id)){toast('EMPTY RIG CELLS BEFORE EQUIPPING A SMALLER RIG');return}if(slot==='backpack'&&preparedBag().length>backpackSlotCount(id)){toast('EMPTY BACKPACK CELLS BEFORE EQUIPPING A SMALLER PACK');return}}await A.removeInventoryRecord(rec.id);removeLocalStashRecord(rec.id);if(old){const added=await A.addInventoryItem(old);currentStash().unshift(added)}equipment[slot]=id;await A.saveLoadout(equipment);if(WEAPONS[id]){initWeaponState(id);activeWeaponSlot=slot}await refreshGearAfterChange(slot);renderStashPanel();rebuildSafehouseDisplays(currentScene);playUiClick(true);toast((C[id]?.name||id).toUpperCase()+' EQUIPPED')}
+  async function unequipPersistent(slot){const id=equipment[slot];if(!id)return;if(slot==='armor'&&isPlateCarrier(id)&&(equipment.front_plate||equipment.back_plate)){toast('REMOVE FRONT/BACK PLATES FIRST');return}if(slot==='rig'&&preparedRig().length){toast('EMPTY THE CHEST RIG FIRST');return}if(slot==='backpack'&&preparedBag().length){toast('EMPTY THE BACKPACK FIRST');return}if(['backpack','rig','armor'].includes(slot)&&preparedWeight()>capacityWith(slot,null)){toast('EMPTY OR LIGHTEN PREPARED LOADOUT FIRST');return}playUiClick();try{const rec=await A.addInventoryItem(id);currentStash().unshift(rec);equipment[slot]=null;await A.saveLoadout(equipment);if(slot===activeWeaponSlot)activeWeaponSlot=WEAPONS[equipment.primary]?'primary':WEAPONS[equipment.secondary]?'secondary':'primary';await refreshGearAfterChange(slot);renderStashPanel();rebuildSafehouseDisplays(currentScene);playUiClick(true);toast((C[id]?.name||id).toUpperCase()+' MOVED TO STASH')}catch(err){console.error(err);toast('UNEQUIP FAILED // '+(err.message||err),3000);await reloadStashData();renderStashPanel()}}
+  async function packStashRecord(rec){const id=rec.item_id,item=C[id];if(preparedWeight()+(item?.weight||0)>bagCapacity()){toast('PREPARED LOADOUT OVERWEIGHT');return}let target='backpack';if(canStoreInRig(id)&&preparedRig().length<rigSlotCount())target='rig';else if(canStoreInPocket(id)&&preparedPockets().length<4)target='pockets';else if(preparedBag().length>=backpackSlotCount()){toast('NO FREE STORAGE CELLS');return}await A.removeInventoryRecord(rec.id);removeLocalStashRecord(rec.id);(target==='rig'?preparedRig():target==='pockets'?preparedPockets():preparedBag()).push(id);await A.saveLoadout(equipment);safehouseConfig.display=(safehouseConfig.display||[]).filter(x=>String(x.recordId)!==String(rec.id));saveSafehouseConfig();renderStashPanel();rebuildSafehouseDisplays(currentScene);playUiClick(true);toast((item?.name||id).toUpperCase()+' → '+target.toUpperCase())}
+  async function unpackPrepared(container,index){const bag=container==='rig'?preparedRig():container==='pockets'?preparedPockets():preparedBag();if(index<0||index>=bag.length)return;const id=bag[index];playUiClick();try{const rec=await A.addInventoryItem(id);currentStash().unshift(rec);bag.splice(index,1);await A.saveLoadout(equipment);renderStashPanel();rebuildSafehouseDisplays(currentScene);playUiClick(true);toast((C[id]?.name||id).toUpperCase()+' RETURNED TO STASH')}catch(err){console.error(err);toast('STASH UPDATE FAILED // '+(err.message||err),3000)}}
+  function toggleDisplayRecord(recordId){const rec=currentStash().find(x=>String(x.id)===String(recordId));if(!rec)return;safehouseConfig.display=safehouseConfig.display||[];const idx=safehouseConfig.display.findIndex(x=>String(x.recordId)===String(recordId));if(idx>=0)safehouseConfig.display.splice(idx,1);else{if(safehouseConfig.display.length>=8){toast('DISPLAY WALL FULL');return}safehouseConfig.display.push({recordId:rec.id,itemId:rec.item_id})}saveSafehouseConfig();renderStashPanel();rebuildSafehouseDisplays(currentScene);playUiClick(true)}
+  function autoDisplayBestLoot(){safehouseConfig.display=[...currentStash()].sort((a,b)=>Number(b.value||0)-Number(a.value||0)).slice(0,8).map(r=>({recordId:r.id,itemId:r.item_id}));saveSafehouseConfig();renderStashPanel();rebuildSafehouseDisplays(currentScene);playUiClick(true);toast('DISPLAY WALL UPDATED')}
+  function clearDisplayLoot(){safehouseConfig.display=[];saveSafehouseConfig();renderStashPanel();rebuildSafehouseDisplays(currentScene);playUiClick(true)}
+  function applySafehouseVisualConfig(){if(!safehouseSceneRefs)return;const themes={concrete:['#242a28','#101412'],olive:['#293128','#111711'],charcoal:['#1d2221','#0a0d0c'],rust:['#342823','#17100d']},floors={sealed:'#202624',dark:'#121716',olive:'#252d25',rust:'#31251f'},lamps={white:'#bfd4bd',warm:'#e0b078',green:'#80b77b',red:'#c75950'},t=themes[safehouseConfig.theme]||themes.concrete;try{safehouseSceneRefs.concrete.diffuseColor=BABYLON.Color3.FromHexString(t[0]);safehouseSceneRefs.dark.diffuseColor=BABYLON.Color3.FromHexString(t[1]);if(safehouseSceneRefs.floor)safehouseSceneRefs.floor.diffuseColor=BABYLON.Color3.FromHexString(floors[safehouseConfig.floor]||floors.sealed);const base=Number(safehouseConfig.light??.82);safehouseSceneRefs.hemi.intensity=(playerData.state?.has_generator?.48:.20)*base;safehouseSceneRefs.lamp.intensity=(playerData.state?.has_generator?1.65:.48)*base;safehouseSceneRefs.lamp.diffuse=BABYLON.Color3.FromHexString(lamps[safehouseConfig.lampColor]||lamps.white)}catch{}}
+  async function rebuildSafehouseDecor(scene){if(sceneMode!=='bunker'||!scene||isDisposedSafe(scene))return;for(const r of safehouseCustomizationRoots){try{r.dispose(false,true)}catch{}}safehouseCustomizationRoots=[];const preset=safehouseConfig.decor||'survival',density=safehouseConfig.clutter||'normal';const sets={minimal:[['chair',[-7.7,0,-8.6],0]],survival:[['fridge',[-8.8,0,-9.6],0],['duffel_bag',[-7.4,0,-10.1],.4],['storage_crate',[-8.5,0,-7.6],0]],workshop:[['tool_cabinet',[-8.8,0,-9.5],Math.PI/2],['hand_truck',[-8.6,0,-7.5],.2],['pallet',[-4.1,0,-9.6],0]],armory:[['locker_bank',[-8.8,0,-9.2],Math.PI/2],['weapon_crate',[-7.0,0,-10.0],0],['ammo_can',[-5.4,0,-10.1],0]]};let list=[...(sets[preset]||sets.survival)];if(density==='sparse')list=list.slice(0,1);if(density==='dense')list=list.concat(preset==='workshop'?[['barrel',[-4.4,0,-7.7],0],['cardboard_box',[-5.1,0,-9.9],.2]]:[['cardboard_box',[-5.0,0,-9.8],.3],['barrel',[-4.3,0,-8.2],0]]);for(const [file,pos,ry] of list){try{const r=await loadModel(scene,file,pos,{rotationY:ry||0,collision:false,scale:file==='ammo_can'?.9:1});if(scene!==currentScene||isDisposedSafe(scene)){r.dispose(false,true);continue}safehouseCustomizationRoots.push(r)}catch(err){console.warn('safehouse decor load failed',file,err)}}}
+  function displayModelForItem(id){if(WEAPONS[id])return WEAPONS[id].model;if(MODEL_CONFIG.gear?.[id])return MODEL_CONFIG.gear[id].file;return {bandage:'loot_bandage',medkit:'loot_medkit',morphine:'loot_morphine',water_bottle:'loot_water',canned_beans:'loot_food',ssd:'loot_ssd',gpu:'loot_gpu',keycard:'loot_keycard',wristwatch:'loot_watch',copper_wire:'loot_copper_wire',battery:'loot_battery',fuel_can:'loot_fuel_can',tool_case:'loot_tool_case',power_inverter:'loot_inverter',frag_grenade:'frag_grenade'}[id]||null}
+  async function rebuildSafehouseDisplays(scene){if(sceneMode!=='bunker'||!scene||isDisposedSafe(scene))return;for(const r of safehouseDisplayRoots){try{r.dispose(false,true)}catch{}}safehouseDisplayRoots=[];sanitizeSafehouseDisplay();const byId=new Map(currentStash().map(x=>[String(x.id),x])),positions=[[6.55,.82,-8.05],[6.55,1.58,-8.05],[6.55,2.34,-8.05],[6.55,3.10,-8.05],[6.55,.82,-4.35],[6.55,1.58,-4.35],[6.55,2.34,-4.35],[6.55,3.10,-4.35]];for(let i=0;i<(safehouseConfig.display||[]).length;i++){const d=safehouseConfig.display[i],rec=byId.get(String(d.recordId));if(!rec)continue;const id=rec.item_id,pos=positions[i],file=displayModelForItem(id);if(file){try{const root=await loadModel(scene,file,pos,{rotationY:-Math.PI/2,collision:false,pickable:false,scale:WEAPONS[id]?0.55:(MODEL_CONFIG.gear?.[id]?0.48:0.7)});safehouseDisplayRoots.push(root);continue}catch{}}const plane=BABYLON.MeshBuilder.CreatePlane('displayCard_'+i,{width:.75,height:.75},scene);plane.position=new BABYLON.Vector3(...pos);plane.rotation.y=-Math.PI/2;plane.isPickable=false;const m=new BABYLON.StandardMaterial('displayCardMat_'+i,scene);m.diffuseTexture=new BABYLON.Texture(itemIcon(id),scene,true,false);m.emissiveColor=new BABYLON.Color3(.18,.22,.17);m.specularColor=BABYLON.Color3.Black();plane.material=m;safehouseDisplayRoots.push(plane)}}
+
+
+  // ---------- INTERACTIONS ----------
+  function addInteraction(mesh,prompt,fn,range=2.6,anchor=null){let point=anchor?(anchor instanceof BABYLON.Vector3?anchor.clone():new BABYLON.Vector3(...anchor)):null,bounds=null;if(!point){try{mesh?.computeWorldMatrix?.(true);for(const c of mesh?.getChildMeshes?.()||[])c.computeWorldMatrix?.(true);const b=mesh?.getHierarchyBoundingVectors?.(true);if(b?.min&&b?.max){bounds={min:b.min.clone(),max:b.max.clone()};point=b.min.add(b.max).scale(.5)}}catch{}}if(!point){const p=mesh?.getAbsolutePosition?.()||mesh?.position||BABYLON.Vector3.Zero();point=p.clone?.()||new BABYLON.Vector3(p.x||0,p.y||0,p.z||0)}const obj={mesh,prompt,fn,range,bounds,point,enabled:true};interactions.push(obj);return obj}
+  function interactionDistance(i,o){if(i.bounds){const x=clamp(o.x,i.bounds.min.x,i.bounds.max.x),y=clamp(o.y,i.bounds.min.y,i.bounds.max.y),z=clamp(o.z,i.bounds.min.z,i.bounds.max.z);return BABYLON.Vector3.Distance(o,new BABYLON.Vector3(x,y,z))}return BABYLON.Vector3.Distance(o,i.point)}
+  function updateInteraction(){const p=$('interactionPrompt');if(anyPanelOpen()||!playerBody||!currentCamera||playerDead){nearest=null;p.classList.add('hidden');return}nearest=null;let best=Infinity;const origin=currentCamera.position;for(const i of interactions){if(!i.enabled||!i.mesh||isDisposedSafe(i.mesh))continue;const d=interactionDistance(i,origin);if(d<=i.range&&d<best){best=d;nearest=i}}if(nearest){p.textContent='[ E ] '+nearest.prompt;p.classList.remove('hidden')}else p.classList.add('hidden')}
+
+  // ---------- INVENTORY / VITALS ----------
+  function recalcWeight(){fieldWeight=allFieldItems().reduce((n,id)=>n+(C[id]?.weight||0),0);updateVitals()}
+  function updateVitals(){$('healthBar').style.width=clamp(health,0,100)+'%';$('healthText').textContent=Math.round(health);$('staminaBar').style.width=clamp(stamina,0,100)+'%';$('staminaText').textContent=Math.round(stamina);$('weightText').textContent=hauledHeavy?`${fieldWeight.toFixed(1)} KG + HEAVY`:`${fieldWeight.toFixed(1)} / ${bagCapacity()} KG`;$('miniItemCount').textContent=`${allFieldItems().length} ITEMS`;if(!inventoryOpen)return;$('bagCapacity').textContent=`${fieldWeight.toFixed(1)} / ${bagCapacity()} KG // ${fieldItems.length}/${backpackSlotCount()} CELLS`}
+  function incomingSide(dir){if(!currentCamera||!dir)return'front';const f=currentCamera.getForwardRay().direction.clone();f.y=0;if(f.lengthSquared()<.001)return'front';f.normalize();const d=dir.clone();d.y=0;if(d.lengthSquared()<.001)return'front';d.normalize();return BABYLON.Vector3.Dot(d,f)<0?'front':'back'}
+  function armorMitigationForHit(zone,dir){zone=(zone||'chest').toLowerCase();if(zone.includes('head')){const h=gearMeta(equipment.head);return h.type==='helmet'?(h.mitigation||0):0}if(zone.includes('chest')||zone.includes('pelvis')){let m=0;if(equipment.armor==='soft_armor')m=Math.max(m,.22);if(isPlateCarrier(equipment.armor)){m=Math.max(m,.08);const plateId=incomingSide(dir)==='front'?equipment.front_plate:equipment.back_plate;const pm=gearMeta(plateId);if(pm.type==='plate')m=Math.max(m,pm.mitigation||0)}return m}return 0}
+  function damagePlayer(amount,source='HOSTILE FIRE',zone='chest',dir=null){if(playerDead)return;const mitigation=clamp(armorMitigationForHit(zone,dir),0,.82);const actual=Math.max(1,amount*(1-mitigation));if(mitigation>.05)toast(`ARMOR ABSORBED ${Math.round(mitigation*100)}% // ${String(zone).toUpperCase()}`,850);health=Math.max(0,health-actual);$('damageFlash').classList.add('hit');setTimeout(()=>$('damageFlash').classList.remove('hit'),120);updateVitals();if(health<=0)playerDeath(source)}
+  function playerDeath(cause){if(playerDead)return;playerDead=true;fireHeld=false;actionBusy=false;stopFpAction();clearActionProp();setViewWeaponVisible(true);stopTimer();releasePointer();$('interactionPrompt').classList.add('hidden');const duration=raidStart?Math.floor((Date.now()-raidStart)/1000):0;$('deathCause').textContent=`Killed by ${cause}. All field loot was lost.`;$('deathStats').innerHTML=`<div><span>DURATION</span><b>${formatTime(duration)}</b></div><div><span>LOOT LOST</span><b>${allFieldItems().length}</b></div><div><span>ZONE</span><b>${MAPS[selectedMapId]?.name||'SURFACE'}</b></div>`;$('deathOverlay').classList.remove('hidden')}
+
+  // ---------- WEAPONS / BALLISTICS ----------
+  function initWeaponState(id){if(!WEAPONS[id])return;if(!weaponStates[id])weaponStates[id]={mag:WEAPONS[id].mag,reserve:WEAPONS[id].reserve}}
+  function initWeapons(){weaponStates={};initWeaponState(equipment.primary);initWeaponState(equipment.secondary);activeWeaponSlot=WEAPONS[equipment.primary]?'primary':'secondary'}
+  function getActiveWeapon(){const id=equipment[activeWeaponSlot];return WEAPONS[id]?{id,...WEAPONS[id],state:weaponStates[id]}:null}
+  async function loadViewWeapon(){if(viewWeapon&&!isDisposedSafe(viewWeapon))viewWeapon.dispose(false,true);viewWeapon=null;weaponPartBases=new Map();const w=getActiveWeapon();if(!w||!currentScene||sceneMode!=='raid'){updateWeaponHud();return}const arms=await loadFirstPersonRig(currentScene);if(!arms||currentScene!==arms.root.getScene()||sceneMode!=='raid')return;const cfg=MODEL_CONFIG.weapons?.[w.id]?.fp||{};const root=await loadModel(currentScene,w.model,[0,0,0],{collision:false,pickable:false,scale:1});if(currentScene!==root.getScene()||sceneMode!=='raid'){root.dispose();return}if(selectedCharacter==='player_ch15'&&firstPersonUsesMixamoWeaponPose()){const mount=ch15WeaponMountProfile(w.id);root.parent=currentCamera;root.position=new BABYLON.Vector3(...arr3(mount.position));root.rotation=new BABYLON.Vector3(...arr3(mount.rotation));const sc=Number(mount.scale??1);root.scaling.set(sc,sc,sc);startFirstPersonAuthoredPose(arms,false,false,{kind:null,t:0});resetMixamoWeaponFollowRef()}else if(selectedCharacter==='player_ch15'){const mount=ch15WeaponMountProfile(w.id);root.parent=currentCamera;root.position=new BABYLON.Vector3(...mount.position);root.rotation=new BABYLON.Vector3(...mount.rotation);const sc=Number(mount.scale??1);root.scaling.set(sc,sc,sc)}else attachAssetToBone(root,boneByName(arms,MODEL_CONFIG.firstPerson?.weaponBone||'Hand_R'),arms.skinMesh||arms.root,cfg);for(const m of root.getChildMeshes?.()||[]){m.isPickable=false;m.renderingGroupId=2;m.alwaysSelectAsActiveMesh=true;m.metadata={...(m.metadata||{}),ignoreBullet:true}}viewWeapon=root;cacheWeaponPartBases(root);attachWorldWeapon(currentScene,playerWorldRig);playWeaponEvent(w.id,'equip');updateWeaponHud();if(weaponEditorOpen)syncWeaponEditorUi()}
+  function updateWeaponView(dt,moving,sprinting){if(!fpRig?.root||isDisposedSafe(fpRig.root))return;swayTime+=dt*(moving?(sprinting?10:7):2.5);weaponKick=Math.max(0,weaponKick-dt*4.2);const action=actionPose();const mixamoFp=firstPersonUsesMixamoWeaponPose();let ikActive=false,authoredFp=false;if(mixamoFp){disposeFirstPersonIK();fpAimBlend+=(Number(aimHeld&&!sprinting)-fpAimBlend)*Math.min(1,dt*12);fpSprintBlend+=(Number(sprinting&&!aimHeld)-fpSprintBlend)*Math.min(1,dt*10);authoredFp=startFirstPersonAuthoredPose(fpRig,moving,sprinting,action)}else{ikActive=selectedCharacter==='player_ch15'&&updateFirstPersonIK(moving,sprinting,action,dt);if(!ikActive)applyWeaponArmPose(moving,sprinting,action,dt)}updateWeaponPartAnimation(action);const base=MODEL_CONFIG.firstPerson||{},charFp=MODEL_CONFIG.characters?.[selectedCharacter]?.firstPersonTransform||{},basePos=arr3(charFp.position||base.basePosition||[0,0,0]),baseRot=arr3(charFp.rotation||base.baseRotation||[0,0,0]);if(selectedCharacter==='player_ch15'&&mixamoFp){fpRig.root.position.set(basePos[0],basePos[1],basePos[2]);fpRig.root.rotation.set(baseRot[0]-weaponKick*.10,baseRot[1],baseRot[2]);applyMixamoWristCorrection();updateCh15WeaponMount(moving,sprinting,action,dt);}else if(selectedCharacter==='player_ch15'){const amp=fpAimBlend>.5?.0015:(fpSprintBlend>.5?.006:moving?.0035:.0012);fpRig.root.position.x=basePos[0]+Math.sin(swayTime)*amp*.45;fpRig.root.position.y=basePos[1]+Math.abs(Math.cos(swayTime*.5))*amp*.35;fpRig.root.position.z=basePos[2];fpRig.root.rotation.set(baseRot[0],baseRot[1],baseRot[2]);updateCh15WeaponMount(moving,sprinting,action,dt)}else{const hold=holdPoseFor(getActiveWeapon()?.id||'ak74'),holdPos=add3(hold.root?.position,FP_ANIM.weaponAdjustments?.[getActiveWeapon()?.id||'ak74']?.rootPos),holdRot=add3(hold.root?.rotation,FP_ANIM.weaponAdjustments?.[getActiveWeapon()?.id||'ak74']?.rootRot),ads=FP_ANIM.stateOffsets?.ads||{},spr=FP_ANIM.stateOffsets?.sprint||{};let rootPos=add3(basePos,holdPos),rootRot=add3(baseRot,holdRot);rootPos=add3(rootPos,ads.rootPos,fpAimBlend);rootRot=add3(rootRot,ads.rootRot,fpAimBlend);rootPos=add3(rootPos,spr.rootPos,fpSprintBlend);rootRot=add3(rootRot,spr.rootRot,fpSprintBlend);rootPos=add3(rootPos,action.rootPos);rootRot=add3(rootRot,action.rootRot);const moveAmp=fpAimBlend>.5?.003:(fpSprintBlend>.5?.022:moving?.012:.0035);fpRig.root.position.x=rootPos[0]+Math.sin(swayTime)*moveAmp;fpRig.root.position.y=rootPos[1]+Math.abs(Math.cos(swayTime*.5))*moveAmp*.55+weaponKick*.20;fpRig.root.position.z=rootPos[2]-weaponKick*.08;fpRig.root.rotation.x=rootRot[0]-weaponKick*.48;fpRig.root.rotation.y=rootRot[1]+Math.sin(swayTime*.4)*moveAmp*.15;fpRig.root.rotation.z=rootRot[2]}currentCamera.fov+=(((aimHeld&&!sprinting)?fieldFov*.72:fieldFov)*Math.PI/180-currentCamera.fov)*Math.min(1,dt*9);$('crosshair').classList.toggle('ads',aimHeld&&!sprinting)}
+  function spareMagazineCount(weaponId){const mag=magazineForWeapon(weaponId);return mag?allFieldItems().filter(id=>id===mag).length:0}
+  function takeSpareMagazine(weaponId){const mag=magazineForWeapon(weaponId);if(!mag)return null;for(const arr of [fieldRigItems,fieldPocketItems,fieldItems]){const i=arr.indexOf(mag);if(i>=0){arr.splice(i,1);recalcWeight();return mag}}return null}
+  function updateWeaponHud(){const w=getActiveWeapon();if(sceneMode!=='raid'||!w){$('weaponHud').classList.add('hidden');return}$('weaponHud').classList.remove('hidden');$('weaponName').textContent=C[w.id]?.name||w.id;$('weaponMode').textContent=`${activeWeaponSlot.toUpperCase()} // ${w.auto?'AUTO':'SEMI'}`;$('magAmmo').textContent=w.state?.mag??0;const magId=magazineForWeapon(w.id);$('reserveAmmo').textContent=magId?spareMagazineCount(w.id):(w.state?.reserve??0);$('ammoType').textContent=magId?`${w.ammoLabel} // SPARE MAGS`:w.ammoLabel;$('weaponHud').classList.toggle('reload',reloading)}
+  function randomSpread(dir,spread){const right=currentCamera.getDirection(BABYLON.Axis.X),up=currentCamera.getDirection(BABYLON.Axis.Y);return dir.add(right.scale(rand(-spread,spread))).add(up.scale(rand(-spread,spread))).normalize()}
+  function fireWeapon(triggerPress=false){const w=getActiveWeapon();if(!w||reloading||actionBusy||playerDead||anyPanelOpen()||sceneMode!=='raid')return;const now=performance.now(),interval=60000/w.rpm;if(w.state.mag<=0){if(triggerPress){toast('MAGAZINE EMPTY');playWeaponEvent(w.id,'dry')}return}if(now-lastShotAt<interval)return;lastShotAt=now;w.state.mag--;const movePenalty=(keys.w||keys.a||keys.s||keys.d)?1.65:1;const sprintPenalty=actualSprinting?2.2:1;const aimBonus=aimHeld?.38:1;const staminaPenalty=1+(100-stamina)/180;const spread=w.spread*movePenalty*sprintPenalty*aimBonus*staminaPenalty;const origin=currentCamera.position.add(currentCamera.getForwardRay().direction.scale(.42));const pellets=w.pellets||1;for(let i=0;i<pellets;i++){const dir=randomSpread(currentCamera.getForwardRay().direction.clone(),spread);spawnBullet('player',origin,dir,w.velocity,w.damage)}weaponKick=Math.min(.12,weaponKick+w.recoil);currentCamera.rotation.x-=w.recoil*rand(.45,.8);currentCamera.rotation.y+=w.recoil*rand(-.22,.22);muzzleFlash();playGun(w.id);if(['pump12','mosin','r700'].includes(w.id))setTimeout(()=>{playWeaponEvent(w.id,'action');startFpAction('action',.48,w.id)},Math.min(700,120+60000/w.rpm*.35));updateWeaponHud()}
+  function startReload(){const w=getActiveWeapon();if(!w||reloading||actionBusy||w.state.mag>=w.mag)return;const magId=magazineForWeapon(w.id);if(magId&&spareMagazineCount(w.id)<=0){toast('NO COMPATIBLE MAGAZINE IN RIG / POCKETS / PACK');return}if(!magId&&w.state.reserve<=0)return;reloading=true;reloadStartedAt=performance.now();reloadEndsAt=reloadStartedAt+w.reload*1000;playWeaponEvent(w.id,'reload');startFpAction('reload',w.reload,w.id);updateWeaponHud();toast('RELOADING',Math.round(w.reload*1000));setTimeout(()=>{if(!reloading)return;if(magId){takeSpareMagazine(w.id);w.state.mag=w.mag}else{const need=w.mag-w.state.mag,take=Math.min(need,w.state.reserve);w.state.mag+=take;w.state.reserve-=take}reloading=false;reloadStartedAt=reloadEndsAt=0;stopFpAction();updateWeaponHud();if(inventoryOpen)renderInventory()},w.reload*1000)}
+  function switchWeapon(slot){if(actionBusy)return;if(reloading){reloading=false;reloadStartedAt=reloadEndsAt=0;stopFpAction()}if(!WEAPONS[equipment[slot]])return;activeWeaponSlot=slot;loadViewWeapon().then(()=>{const w=getActiveWeapon();if(w)startFpAction('equip',.45,w.id)});toast(C[equipment[slot]].name.toUpperCase())}
+  function spawnBullet(owner,origin,dir,velocity,damage){const mesh=BABYLON.MeshBuilder.CreateSphere('bullet',{diameter:.025,segments:4},currentScene);mesh.position.copyFrom(origin);mesh.material=mat(currentScene,'tracer','#d9c87c','#d9c87c');mesh.isPickable=false;mesh.metadata={ignoreBullet:true};bullets.push({owner,pos:origin.clone(),vel:dir.scale(velocity),damage,life:2.5,mesh})}
+  function bulletStep(dt){if(sceneMode!=='raid'||!currentScene)return;for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];b.life-=dt;if(b.life<=0||!b.mesh||isDisposedSafe(b.mesh)){b.mesh?.dispose();bullets.splice(i,1);continue}const next=b.pos.add(b.vel.scale(dt)),delta=next.subtract(b.pos),dist=delta.length();if(dist>.0001){const ray=new BABYLON.Ray(b.pos,delta.normalize(),dist);const hit=currentScene.pickWithRay(ray,m=>{if(!m||!m.isPickable||m.metadata?.ignoreBullet)return false;if(b.owner==='player'&&m.metadata?.playerTarget)return false;if(b.owner==='enemy'&&m.metadata?.enemyPart)return false;return true});if(hit?.hit&&hit.pickedPoint){if(b.owner==='enemy'&&hit.pickedMesh?.metadata?.playerTarget){damagePlayer(b.damage*(hit.pickedMesh?.metadata?.multiplier||1),'HOSTILE FIRE',hit.pickedMesh?.metadata?.zone||'chest',b.vel.normalize())}else if(b.owner==='player'&&hit.pickedMesh?.metadata?.enemyPart){damageEnemy(hit.pickedMesh.metadata.enemyRef,b.damage*(hit.pickedMesh.metadata.multiplier||1),hit.pickedPoint,b.vel.normalize())}else{spawnImpact(hit.pickedPoint)}b.mesh.dispose();bullets.splice(i,1);continue}}b.pos.copyFrom(next);b.vel.y-=9.81*dt;b.mesh.position.copyFrom(b.pos)}}
+  function muzzleFlash(){if(!currentScene||!currentCamera)return;const p=currentCamera.position.add(currentCamera.getForwardRay().direction.scale(.55));const light=new BABYLON.PointLight('muzzle',p,currentScene);light.diffuse=new BABYLON.Color3(1,.63,.2);light.intensity=2.6;light.range=4;setTimeout(()=>{try{light.dispose()}catch{}},45)}
+  function spawnImpact(point){if(!currentScene)return;const m=BABYLON.MeshBuilder.CreateSphere('impact',{diameter:.045,segments:4},currentScene);m.position.copyFrom(point);m.material=mat(currentScene,'impactMat','#9b8f76','#675c44');m.isPickable=false;setTimeout(()=>m.dispose(),800)}
+  function spawnBlood(point,dir){if(!currentScene)return;for(let i=0;i<9;i++){const p=BABYLON.MeshBuilder.CreateSphere('blood',{diameter:rand(.025,.06),segments:4},currentScene);p.position.copyFrom(point);p.material=mat(currentScene,'bloodMat','#6b1514');p.isPickable=false;bloodParticles.push({mesh:p,vel:dir.scale(rand(.4,1.7)).add(new BABYLON.Vector3(rand(-1,1),rand(.2,1.5),rand(-1,1))),life:rand(.35,.8)})}const puddle=BABYLON.MeshBuilder.CreateCylinder('bloodPuddle',{diameter:rand(.35,.7),height:.008,tessellation:20},currentScene);puddle.position=new BABYLON.Vector3(point.x,.012,point.z);puddle.scaling.z=rand(.6,1.3);puddle.material=mat(currentScene,'bloodPuddleMat','#421010');puddle.isPickable=false}
+  function bloodStep(dt){for(let i=bloodParticles.length-1;i>=0;i--){const p=bloodParticles[i];p.life-=dt;if(p.life<=0){p.mesh.dispose();bloodParticles.splice(i,1);continue}p.vel.y-=9.81*dt;p.mesh.position.addInPlace(p.vel.scale(dt));if(p.mesh.position.y<.03){p.mesh.position.y=.03;p.vel.scaleInPlace(.18)}}}
+  function playNoise(duration=.06,gain=.14,low=220,high=1400){try{const ctx=playNoise.ctx||(playNoise.ctx=new (window.AudioContext||window.webkitAudioContext)());const buffer=ctx.createBuffer(1,ctx.sampleRate*duration,ctx.sampleRate),data=buffer.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*(1-i/data.length);const src=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),g=ctx.createGain();filter.type='bandpass';filter.frequency.value=rand(low,high);g.gain.value=gain;src.buffer=buffer;src.connect(filter);filter.connect(g);g.connect(ctx.destination);src.start()}catch{}}
+  function playGun(id,position=null){playWeaponEvent(id,'fire',position?{position}:{} )}function playDry(){playNoise(.018,.035,700,1600)}
+
+  // ---------- ENEMIES / RAGDOLLS ----------
+  function enemyWeaponAnimSet(e){const explicit=e?.variant?.animationSet;if(explicit&&explicit!=='auto')return explicit;return MODEL_CONFIG.weapons?.[e?.weapon]?.animationSet||(['makarov','glock17','pistol1911'].includes(e?.weapon)?'pistol':'rifle')}
+  function enemyAuthoredClip(e,moving,fast,engaged){const set=enemyWeaponAnimSet(e);if(set==='pistol'){if(fast)return'pistol_run';if(moving)return'pistol_walk';if(engaged)return'pistol_aim_idle';return'pistol_idle'}if(fast)return'rifle_run';if(moving)return'rifle_walk';if(engaged)return'rifle_aim_idle';return'rifle_idle'}
+  function updateEnemyAuthoredAnimation(e,moving,fast,engaged){if(!e?.variant?.authoredAnimations||!e.rig)return false;const clip=enemyAuthoredClip(e,moving,fast,engaged);const speed=clip==='rifle_walk'?1.28:clip==='rifle_run'?1.18:clip==='pistol_walk'?1.0:clip==='pistol_run'?1.0:1;return startAuthoredLocomotion(e.rig,clip,speed)}
+  function createEnemyBoneHitboxes(scene,e){if(!e?.rig?.skeleton)return[];const defs=[
+      ['head','Head',[.28,.30,.28],[0,.02,0],2.2],['chest','Chest',[.48,.52,.32],[0,-.04,0],1.0],['pelvis','Hips',[.42,.34,.30],[0,.02,0],.95],
+      ['armL','UpperArm_L',[.18,.40,.18],[0,-.17,0],.72],['armR','UpperArm_R',[.18,.40,.18],[0,-.17,0],.72],['legL','UpperLeg_L',[.22,.60,.22],[0,-.27,0],.78],['legR','UpperLeg_R',[.22,.60,.22],[0,-.27,0],.78]
+    ],out=[];for(const[name,boneName,size,pos,multiplier]of defs){const bone=boneByName(e.rig,boneName);if(!bone)continue;const h=BABYLON.MeshBuilder.CreateBox('ENEMY_HIT_'+name,{width:size[0],height:size[1],depth:size[2]},scene);h.isVisible=true;h.visibility=0;h.isPickable=true;h.checkCollisions=false;h.metadata={enemyPart:true,enemyHitbox:true,enemyRef:e,multiplier};try{h.attachToBone(bone,e.rig.skinMesh||e.rig.root)}catch{h.parent=e.rig.root}h.position=new BABYLON.Vector3(...pos);out.push(h)}return out}
+  function configureImportedEnemyRig(scene,e){if(!e?.rig)return;if(e.variant?.boneHitboxes){for(const m of e.rig.meshes||[]){if(!(m.getTotalVertices&&m.getTotalVertices()>0))continue;m.isPickable=false;m.metadata={...(m.metadata||{}),ignoreBullet:true,enemyVisual:true}}e.hitboxes=createEnemyBoneHitboxes(scene,e)}else configureCharacterMeshes(e.rig,e)}
+  function createEnemyPhysicsRagdoll(e){
+    if(!e?.rig?.skeleton||!e.rig.root||typeof BABYLON.Ragdoll!=='function')return null;
+    const ragScene=e.rig.root.getScene?.();
+    if(!ragScene?.metadata?.deadhaulPhysics)return null;
+    try{
+      const rootBone=e.rig.skeleton.getChildren?.()?.[0],rootName=rootBone?.name||boneByName(e.rig,'Hips')?.name;
+      if(!rootName)return null;
+      const cfg=[],used=new Set();
+      const add=(alias,w,h,d,mass,extra={})=>{
+        const bone=alias==='__ROOT__'?rootBone:boneByName(e.rig,alias);
+        if(!bone||used.has(bone.name))return;
+        used.add(bone.name);
+        cfg.push({bone:bone.name,width:w,height:h,depth:d,mass,restitution:0,...extra});
+      };
+      // Shooter-style body: fewer, heavier torso pieces and conservative limb proxies.
+      // Hands/feet remain skinned to the simulated forearms/shins instead of getting
+      // tiny independent bodies that make a corpse twitch and snag on level geometry.
+      add('__ROOT__',.30,.24,.25,12.0);
+      add('Chest',.38,.31,.25,18.0,{putBoxInBoneCenter:true});
+      add('Head',.21,.23,.21,4.5,{putBoxInBoneCenter:true});
+      add('UpperArm_L',.105,.28,.105,2.5,{putBoxInBoneCenter:true});
+      add('LowerArm_L',.09,.25,.09,1.7,{putBoxInBoneCenter:true});
+      add('UpperArm_R',.105,.28,.105,2.5,{putBoxInBoneCenter:true});
+      add('LowerArm_R',.09,.25,.09,1.7,{putBoxInBoneCenter:true});
+      add('UpperLeg_L',.145,.39,.145,7.2,{putBoxInBoneCenter:true});
+      add('LowerLeg_L',.12,.37,.12,4.8,{putBoxInBoneCenter:true});
+      add('UpperLeg_R',.145,.39,.145,7.2,{putBoxInBoneCenter:true});
+      add('LowerLeg_R',.12,.37,.12,4.8,{putBoxInBoneCenter:true});
+      if(!cfg.length||cfg[0].bone!==rootName){console.warn('Enemy ragdoll root config mismatch',rootName);return null}
+      const rd=new BABYLON.Ragdoll(e.rig.skeleton,e.rig.root,cfg);
+      e.physicsRagdollBoneNames=cfg.map(x=>x.bone);
+      e.physicsRagdollConfig=cfg;
+      return rd;
+    }catch(err){console.warn('Enemy Havok ragdoll setup failed',e?.variant?.label||'',err);return null}
+  }
+  function ragdollAggregates(e){
+    const out=[],seen=new Set(),rd=e?.physicsRagdoll;
+    if(!rd)return out;
+    const indices=[-1,...Array.from({length:e.physicsRagdollBoneNames?.length||0},(_,i)=>i)];
+    for(const i of indices){
+      try{const a=rd.getAggregate?.(i);if(a&&!seen.has(a)){seen.add(a);out.push(a)}}catch{}
+    }
+    return out;
+  }
+  const RD_DEG=Math.PI/180;
+  function enemyRagdollJointProfile(alias){
+    // Angular limits are intentionally conservative. A dead body is loose, but human
+    // joints still stop shoulders, elbows, hips and knees from rotating through 360°.
+    const p={
+      Chest:{x:[-18,22],y:[-24,24],z:[-16,16]},
+      Head:{x:[-38,28],y:[-42,42],z:[-28,28]},
+      UpperArm_L:{x:[-75,75],y:[-70,70],z:[-92,55]},
+      UpperArm_R:{x:[-75,75],y:[-70,70],z:[-55,92]},
+      LowerArm_L:{x:[-8,128],y:[-9,9],z:[-9,9]},
+      LowerArm_R:{x:[-8,128],y:[-9,9],z:[-9,9]},
+      UpperLeg_L:{x:[-48,72],y:[-24,24],z:[-34,28]},
+      UpperLeg_R:{x:[-48,72],y:[-24,24],z:[-28,34]},
+      LowerLeg_L:{x:[-6,118],y:[-6,6],z:[-6,6]},
+      LowerLeg_R:{x:[-6,118],y:[-6,6],z:[-6,6]}
+    };
+    return p[alias]||{x:[-12,12],y:[-12,12],z:[-12,12]};
+  }
+  function ragdollAliasForBone(e,boneName){
+    const aliases=['Chest','Head','UpperArm_L','LowerArm_L','UpperArm_R','LowerArm_R','UpperLeg_L','LowerLeg_L','UpperLeg_R','LowerLeg_R'];
+    for(const alias of aliases)if(boneByName(e.rig,alias)?.name===boneName)return alias;
+    return boneName===e.physicsRagdollBoneNames?.[0]?'Hips':boneName;
+  }
+  function createLimitedEnemyRagdollConstraints(e){
+    const rd=e?.physicsRagdoll,scene=e?.rig?.root?.getScene?.();
+    if(!rd||!scene||typeof BABYLON.Physics6DoFConstraint!=='function'||!BABYLON.PhysicsConstraintAxis)return[];
+    // Babylon's experimental Ragdoll helper creates unrestricted hinge/ball joints.
+    // Disable those and replace them with explicit 6DOF anatomical limits.
+    for(const c of rd.getConstraints?.()||[])try{c.isEnabled=false}catch{}
+    const names=e.physicsRagdollBoneNames||[],nameSet=new Set(names),out=[];
+    const AX=BABYLON.PhysicsConstraintAxis;
+    for(let i=1;i<names.length;i++){
+      const childName=names[i],childBone=e.rig.skeleton.bones[e.rig.skeleton.getBoneIndexByName(childName)];
+      if(!childBone)continue;
+      let parentBone=childBone.getParent?.();
+      while(parentBone&&!nameSet.has(parentBone.name))parentBone=parentBone.getParent?.();
+      if(!parentBone)continue;
+      const pi=names.indexOf(parentBone.name),parentAgg=rd.getAggregate?.(pi),childAgg=rd.getAggregate?.(i);
+      if(!parentAgg?.body||!childAgg?.body)continue;
+      try{
+        const jointWorld=childBone.getAbsolutePosition(e.rig.root);
+        const invA=parentAgg.transformNode.computeWorldMatrix(true).clone().invert(),invB=childAgg.transformNode.computeWorldMatrix(true).clone().invert();
+        const pivotA=BABYLON.Vector3.TransformCoordinates(jointWorld,invA),pivotB=BABYLON.Vector3.TransformCoordinates(jointWorld,invB);
+        const profile=enemyRagdollJointProfile(ragdollAliasForBone(e,childName));
+        const limits=[
+          {axis:AX.LINEAR_X,minLimit:0,maxLimit:0},{axis:AX.LINEAR_Y,minLimit:0,maxLimit:0},{axis:AX.LINEAR_Z,minLimit:0,maxLimit:0},
+          {axis:AX.ANGULAR_X,minLimit:profile.x[0]*RD_DEG,maxLimit:profile.x[1]*RD_DEG},
+          {axis:AX.ANGULAR_Y,minLimit:profile.y[0]*RD_DEG,maxLimit:profile.y[1]*RD_DEG},
+          {axis:AX.ANGULAR_Z,minLimit:profile.z[0]*RD_DEG,maxLimit:profile.z[1]*RD_DEG}
+        ];
+        const axis=new BABYLON.Vector3(1,0,0),perp=new BABYLON.Vector3(0,1,0);
+        const c=new BABYLON.Physics6DoFConstraint({pivotA,pivotB,axisA:axis,axisB:axis,perpAxisA:perp,perpAxisB:perp,collision:false},limits,scene);
+        parentAgg.body.addConstraint(childAgg.body,c);
+        // Joint friction removes the frictionless-marionette look without fighting gravity.
+        try{c.setAxisFriction(AX.ANGULAR_X,1.25);c.setAxisFriction(AX.ANGULAR_Y,1.25);c.setAxisFriction(AX.ANGULAR_Z,1.25)}catch{}
+        out.push(c);
+      }catch(err){console.warn('Limited ragdoll joint failed',childName,err)}
+    }
+    e.customRagdollConstraints=out;
+    return out;
+  }
+  function configureStableRagdollPhysics(e){
+    const membership=0x2,collideMask=0xFFFFFFFD;
+    for(const a of ragdollAggregates(e)){
+      try{if(a.shape){a.shape.filterMembershipMask=membership;a.shape.filterCollideMask=collideMask}}catch{}
+      try{if(a.material){a.material.friction=.88;a.material.restitution=0}}catch{}
+      try{a.body?.setLinearDamping?.(.24);a.body?.setAngularDamping?.(.58)}catch{}
+      try{a.body?.setLinearVelocity?.(BABYLON.Vector3.Zero())}catch{}
+      try{a.body?.setAngularVelocity?.(BABYLON.Vector3.Zero())}catch{}
+    }
+  }
+  function freezeSettledRagdoll(e){
+    if(!BABYLON.PhysicsMotionType)return;
+    for(const a of ragdollAggregates(e))try{a.body?.setLinearVelocity?.(BABYLON.Vector3.Zero());a.body?.setAngularVelocity?.(BABYLON.Vector3.Zero());a.body?.setMotionType?.(BABYLON.PhysicsMotionType.STATIC)}catch{}
+  }
+  function finiteVec3(v){return !!v&&[v.x,v.y,v.z].every(Number.isFinite)}
+  function capBodyVelocity(body,maxLinear,maxAngular){
+    if(!body)return;
+    try{
+      const lv=body.getLinearVelocity?.();
+      if(finiteVec3(lv)){
+        const n=lv.length();
+        if(n>maxLinear&&n>0)body.setLinearVelocity?.(lv.scale(maxLinear/n));
+      }
+    }catch{}
+    try{
+      const av=body.getAngularVelocity?.();
+      if(finiteVec3(av)){
+        const n=av.length();
+        if(n>maxAngular&&n>0)body.setAngularVelocity?.(av.scale(maxAngular/n));
+      }
+    }catch{}
+  }
+  function physicsRagdollPosition(e){try{const a=e?.physicsRagdoll?.getAggregate?.(-1),p=a?.transformNode?.getAbsolutePosition?.()||a?.transformNode?.position;return p?.clone?.()||null}catch{return null}}
+  function createEnemy(scene,pos,opts={}){const motionRoot=new BABYLON.TransformNode('raiderMotion',scene);motionRoot.position=new BABYLON.Vector3(...pos);const collider=collisionBox(scene,'enemy',[.68,1.8,.68],[pos[0],.9,pos[2]]);collider.metadata={ignoreBullet:true,enemyCollider:true};const tier=opts.tier||1,weapon=opts.weapon||choose(tier>=3?['ak74','m4a1','mp5','sks']:tier===2?['ak74','mp5','sks','pump12']:['makarov','glock17','sks']);const variants=MODEL_CONFIG.raiders||[];const v=opts.variant||variants[Math.min(variants.length-1,Math.max(0,tier-1))]||variants[Math.floor(Math.random()*Math.max(1,variants.length))]||{file:'raider_01',weaponBone:'Hand_R'};const e={root:motionRoot,rig:null,collider,health:90+tier*18,dead:false,tier,weapon,variant:v,hitboxes:[],nextShot:performance.now()+rand(600,1900),lootProfile:opts.lootProfile||'civilian',patrol:new BABYLON.Vector3(pos[0]+rand(-8,8),0,pos[2]+rand(-8,8)),speed:1.05+tier*.12,walkCycle:rand(0,6),ragdoll:null,physicsRagdoll:null,weaponRoot:null};enemies.push(e);(async()=>{try{const rig=await loadRiggedModel(scene,v.file,[0,0,0],{scale:v.scale??1,pickable:true,name:'raiderRig'});if(e.dead||isDisposedSafe(motionRoot)||motionRoot.getScene()!==scene){rig.root.dispose(false,true);return}rig.root.parent=motionRoot;rig.root.position.set(0,0,0);e.rig=rig;configureImportedEnemyRig(scene,e);if(v.authoredAnimations)startAuthoredLocomotion(rig,enemyAuthoredClip(e,false,false,false),1);e.physicsRagdoll=null;const wm=WEAPONS[weapon]?.model;if(wm){const base=MODEL_CONFIG.weapons?.[weapon]?.world||{},extra=v.weaponMount||{},wc={position:extra.position||base.position||[0,0,0],rotation:extra.rotation||base.rotation||[0,0,0],scale:(base.scale??1)*(extra.scale??1)};const gun=await loadModel(scene,wm,[0,0,0],{collision:false,pickable:false,scale:1});if(e.dead||isDisposedSafe(motionRoot)){gun.dispose();return}attachAssetToBone(gun,boneByName(rig,v.weaponBone||'Hand_R'),rig.skinMesh||rig.root,wc);for(const mm of gun.getChildMeshes?.()||[])mm.metadata={...(mm.metadata||{}),ignoreBullet:true};e.weaponRoot=gun}}catch(err){console.warn('raider rig load failed',v.file,err)}})();return e}
+  function enemyStep(dt){if(sceneMode!=='raid'||playerDead||anyPanelOpen()||!playerBody)return;for(const e of enemies){if(e.dead||isDisposedSafe(e.root))continue;const ep=e.root.position,pp=playerBody.position,dx=pp.x-ep.x,dz=pp.z-ep.z,dist=Math.hypot(dx,dz);const sees=dist<48;e.walkCycle+=dt*(dist>11?7:2.2);let moving=false,fast=false;if(sees){e.root.rotation.y=Math.atan2(dx,dz);if(dist>11){const dir=new BABYLON.Vector3(dx,0,dz).normalize();const d=dir.scale(e.speed*dt);e.collider.moveWithCollisions(d);e.root.position.x=e.collider.position.x;e.root.position.z=e.collider.position.z;moving=true;fast=true}if(dist<42&&performance.now()>e.nextShot){enemyFire(e,dist);const w=WEAPONS[e.weapon]||WEAPONS.makarov;e.nextShot=performance.now()+60000/w.rpm*rand(1.4,2.8)}}else{const dx2=e.patrol.x-ep.x,dz2=e.patrol.z-ep.z;if(Math.hypot(dx2,dz2)<1.5)e.patrol=new BABYLON.Vector3(ep.x+rand(-10,10),0,ep.z+rand(-10,10));else{const dir=new BABYLON.Vector3(dx2,0,dz2).normalize();e.collider.moveWithCollisions(dir.scale(e.speed*.5*dt));e.root.position.x=e.collider.position.x;e.root.position.z=e.collider.position.z;e.root.rotation.y=Math.atan2(dir.x,dir.z);moving=true}}if(!updateEnemyAuthoredAnimation(e,moving,fast,sees)){animateRigLegs(e.rig,fast?.30:moving?.16:.025,e.walkCycle);applyWorldWeaponPose(e.rig,e.weapon)}}}
+  function enemyFire(e,dist){const w=WEAPONS[e.weapon]||WEAPONS.makarov;const origin=e.root.position.add(new BABYLON.Vector3(0,1.55,0)),target=currentCamera.position.clone(),dir=target.subtract(origin).normalize();const inaccuracy=.014+dist*.00065+(e.tier===1?.012:0);dir.x+=rand(-inaccuracy,inaccuracy);dir.y+=rand(-inaccuracy,inaccuracy);dir.z+=rand(-inaccuracy,inaccuracy);dir.normalize();spawnBullet('enemy',origin,dir,w.velocity,w.damage*.72);playGun(e.weapon,e.root.position)}
+  function damageEnemy(e,amount,point,dir){if(!e||e.dead)return;e.health-=amount;spawnBlood(point,dir);if(e.health<=0)killEnemy(e,dir)}
+  function finiteQuat(q){return !!q&&[q.x,q.y,q.z,q.w].every(Number.isFinite)}
+  function captureBoneLocalQuat(bone){
+    if(!bone)return BABYLON.Quaternion.Identity();
+    try{const q=bone.getRotationQuaternion?.(BABYLON.Space.LOCAL);if(finiteQuat(q))return q.clone()}catch{}
+    try{const sc=new BABYLON.Vector3(),q=new BABYLON.Quaternion(),tr=new BABYLON.Vector3();if(bone.getLocalMatrix?.().decompose(sc,q,tr)&&finiteQuat(q))return q}catch{}
+    return BABYLON.Quaternion.Identity();
+  }
+  function applyControlledDeathBone(e,r,alias,x=0,y=0,z=0,amount=1){
+    const bone=boneByName(e?.rig,alias),base=r?.boneBase?.[alias];if(!bone||!base)return;
+    try{
+      const delta=BABYLON.Quaternion.RotationYawPitchRoll(y,x,z),target=base.multiply(delta),q=BABYLON.Quaternion.Slerp(base,target,amount);
+      if(finiteQuat(q))bone.setRotationQuaternion(q,BABYLON.Space.LOCAL);
+    }catch{}
+  }
+  function controlledCorpsePoint(e,r){
+    // Motion root is at the feet. Once the body tips over, move the loot trigger
+    // toward the torso rather than leaving SEARCH BODY at the standing position.
+    const yaw=r?.startRot?.y??e?.root?.rotation?.y??0,pitch=r?.fallPitch??0,roll=r?.fallRoll??0;
+    const amount=r?.settle??0;
+    const forward=new BABYLON.Vector3(Math.sin(yaw),0,Math.cos(yaw)),right=new BABYLON.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
+    const along=forward.scale(Math.sign(pitch||1)*.72*amount),side=right.scale(Math.sign(roll||1)*Math.min(.18,Math.abs(roll)*.22)*amount);
+    return e.root.position.add(along).add(side).add(new BABYLON.Vector3(0,.42,0));
+  }
+  const ENEMY_DEATH_CLIPS={
+    death_forward:{duration:3.1667,label:'Standing Death Forward 01'},
+    death_generic:{duration:3.0333,label:'Death'},
+    death_front_hit:{duration:3.4334,label:'Death From The Front'}
+  };
+  const SOFT_DEATH_BONES=['Neck','Head','UpperArm_L','LowerArm_L','Hand_L','UpperArm_R','LowerArm_R','Hand_R','UpperLeg_L','LowerLeg_L','Foot_L','UpperLeg_R','LowerLeg_R','Foot_R'];
+  function enemyDeathClipForShot(e,shotDir){
+    const flat=shotDir?.clone?.()||BABYLON.Vector3.Zero();flat.y=0;
+    if(flat.lengthSquared()>.0001)flat.normalize();
+    const yaw=e?.root?.rotation?.y||0,forward=new BABYLON.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+    const dot=flat.lengthSquared()>.0001?BABYLON.Vector3.Dot(flat,forward):0;
+    // Projectile travelling opposite the enemy's facing direction = hit from front.
+    if(dot<-.28&&findAnimationGroup(e.rig,'death_front_hit'))return'death_front_hit';
+    // A rear hit gets the authored forward collapse most of the time.
+    if(dot>.28&&findAnimationGroup(e.rig,'death_forward'))return Math.random()<.78?'death_forward':'death_generic';
+    const options=['death_generic','death_forward','death_front_hit'].filter(n=>findAnimationGroup(e.rig,n));
+    return options.length?choose(options):null;
+  }
+  function beginEnemyDeathAnimation(e,shotDir){
+    if(!e?.rig)return null;
+    const clip=enemyDeathClipForShot(e,shotDir),g=findAnimationGroup(e.rig,clip);
+    if(!g)return null;
+    try{
+      for(const other of animationGroupsOf(e.rig))if(other!==g)try{other.stop()}catch{}
+      for(const ta of g.targetedAnimations||[])if(ta?.animation){ta.animation.enableBlending=true;ta.animation.blendingSpeed=.18}
+      g.stop();g.start(false,1,g.from,g.to,false);
+      authoredRigStates.set(e.rig,{clip,group:g});
+      return{clip,group:g,duration:ENEMY_DEATH_CLIPS[clip]?.duration||3.2};
+    }catch(err){console.warn('Enemy authored death failed',clip,err);return null}
+  }
+  function corpseChestPoint(e){
+    try{
+      const b=boneByName(e?.rig,'Chest')||boneByName(e?.rig,'Hips');
+      const p=b?.getAbsolutePosition?.(e.rig.root);
+      if(finiteVec3(p))return p.clone();
+    }catch{}
+    return e.root.position.add(new BABYLON.Vector3(0,.45,0));
+  }
+  function softDeathAmplitude(alias){
+    if(alias==='Head'||alias==='Neck')return[.032,.022,.030];
+    if(alias.startsWith('Hand'))return[.060,.030,.050];
+    if(alias.startsWith('LowerArm'))return[.052,.022,.042];
+    if(alias.startsWith('UpperArm'))return[.038,.020,.032];
+    if(alias.startsWith('LowerLeg'))return[.034,.014,.024];
+    if(alias.startsWith('UpperLeg'))return[.026,.012,.020];
+    return[.026,.012,.022];
+  }
+  function initDeathSoftSeeds(r){
+    if(r.softSeeds)return;
+    r.softSeeds={};
+    for(const alias of SOFT_DEATH_BONES)r.softSeeds[alias]={phase:rand(0,Math.PI*2),rate:rand(5.1,7.8),sign:Math.random()<.5?-1:1};
+  }
+  function applyAnimatedDeathSoftness(e,r,t){
+    initDeathSoftSeeds(r);
+    const d=Math.max(.1,r.duration||3.2),begin=d*.58,end=d*.985;
+    if(t<=begin||t>=end)return;
+    const rise=smooth01(clamp((t-begin)/(d*.18),0,1));
+    const fade=1-smooth01(clamp((t-d*.82)/(d*.17),0,1));
+    const amount=rise*(.38+.62*fade);
+    for(const alias of SOFT_DEATH_BONES){
+      const bone=boneByName(e?.rig,alias);if(!bone)continue;
+      const base=captureBoneLocalQuat(bone),a=softDeathAmplitude(alias),seed=r.softSeeds[alias];
+      const wave=Math.sin(t*seed.rate+seed.phase),wave2=Math.sin(t*(seed.rate*.73)+seed.phase*1.37);
+      const delta=BABYLON.Quaternion.RotationYawPitchRoll(a[1]*wave2*amount,a[0]*wave*amount,a[2]*wave2*seed.sign*amount);
+      const q=base.multiply(delta);if(finiteQuat(q))try{bone.setRotationQuaternion(q,BABYLON.Space.LOCAL)}catch{}
+    }
+  }
+  function initPostDeathSettle(e,r){
+    if(r.settleReady)return;
+    r.settleReady=true;r.settleStart=r.t;r.finalBoneBase={};initDeathSoftSeeds(r);
+    for(const alias of SOFT_DEATH_BONES)r.finalBoneBase[alias]=captureBoneLocalQuat(boneByName(e.rig,alias));
+  }
+  function applyPostDeathSettle(e,r){
+    initPostDeathSettle(e,r);
+    const t=Math.max(0,r.t-r.settleStart),decay=Math.exp(-5.6*t);
+    for(const alias of SOFT_DEATH_BONES){
+      const bone=boneByName(e?.rig,alias),base=r.finalBoneBase?.[alias],seed=r.softSeeds?.[alias];if(!bone||!base||!seed)continue;
+      const a=softDeathAmplitude(alias),mul=.55*decay,w=Math.sin(t*seed.rate+seed.phase),w2=Math.sin(t*(seed.rate*.76)+seed.phase*1.31);
+      const delta=BABYLON.Quaternion.RotationYawPitchRoll(a[1]*w2*mul,a[0]*w*mul,a[2]*w2*seed.sign*mul);
+      const q=base.multiply(delta);if(finiteQuat(q))try{bone.setRotationQuaternion(q,BABYLON.Space.LOCAL)}catch{}
+    }
+    if(t>.78)r.frozen=true;
+  }
+  function killEnemy(e,shotDir){
+    if(e.dead)return;
+    e.dead=true;
+    for(const h of e.hitboxes||[]){h.isPickable=false;h.metadata={...(h.metadata||{}),ignoreBullet:true}}
+    e.collider.isPickable=false;e.collider.checkCollisions=false;e.collider.metadata={...(e.collider.metadata||{}),ignoreBullet:true,deadEnemyCollider:true};
+    try{e.collider.setEnabled(false)}catch{}
+    for(const m of e.rig?.meshes||[]){m.isPickable=false;m.metadata={...(m.metadata||{}),ignoreBullet:true,corpseVisual:true}}
+
+    const authored=beginEnemyDeathAnimation(e,shotDir);
+    e.ragdoll={
+      t:0,softRagdoll:true,authoredDeath:!!authored,deathClip:authored?.clip||null,deathGroup:authored?.group||null,
+      duration:authored?.duration||1.05,animEnded:false,settleReady:false,softSeeds:null,frozen:false,trigger:null,interaction:null,
+      fallbackStartRot:e.root.rotation.clone(),fallbackStartY:e.root.position.y
+    };
+    if(authored?.group?.onAnimationGroupEndObservable){
+      try{authored.group.onAnimationGroupEndObservable.addOnce(()=>{if(e.ragdoll)e.ragdoll.animEnded=true})}catch{}
+    }
+    ragdolls.push(e);
+    const corpsePos=corpseChestPoint(e);
+    const trigger=interactionTrigger(currentScene,'corpse',[corpsePos.x,corpsePos.y,corpsePos.z],[1.9,1.45,1.9]);
+    e.ragdoll.trigger=trigger;
+    const loot={name:'FALLEN RAIDER',items:rollEnemyLoot(e)};
+    e.ragdoll.interaction=addInteraction(trigger,'SEARCH BODY',()=>openLoot(loot),2.5,[corpsePos.x,corpsePos.y,corpsePos.z]);
+    toast('HOSTILE DOWN');
+  }
+  function ragdollStep(dt){
+    for(const e of ragdolls){
+      const r=e.ragdoll;if(!r||!e.rig||isDisposedSafe(e.root)||r.frozen)continue;
+      r.t+=dt;
+      if(r.authoredDeath){
+        // The authored clip supplies the actual fall. Only add a few degrees of
+        // damped secondary movement near impact; never apply world-space impulse.
+        if(!r.animEnded&&r.t<r.duration+.12)applyAnimatedDeathSoftness(e,r,r.t);
+        if(r.animEnded||r.t>=r.duration)applyPostDeathSettle(e,r);
+      }else{
+        // Emergency fallback for a model with no death clips: a low-energy drop,
+        // not the old full physics chain.
+        const a=smooth01(clamp(r.t/.82,0,1));
+        e.root.rotation.x=r.fallbackStartRot.x+1.42*a;
+        e.root.rotation.z=r.fallbackStartRot.z+.06*Math.sin(r.t*7)*Math.exp(-r.t*4);
+        e.root.position.y=r.fallbackStartY-.06*a;
+        if(r.t>.9){initPostDeathSettle(e,r);applyPostDeathSettle(e,r)}
+      }
+      const p=corpseChestPoint(e);
+      if(r.trigger&&!isDisposedSafe(r.trigger))r.trigger.position.copyFrom(p);
+      if(r.interaction){r.interaction.point.copyFrom(p);r.interaction.bounds=null}
+    }
+  }
+  function rollEnemyLoot(e){const items=[];if(Math.random()<.88)items.push(e.weapon);const w=WEAPONS[e.weapon];if(w&&Math.random()<.92)items.push(w.ammo);const table=e.lootProfile==='military'?'military':'civilian';const n=Math.floor(rand(1,4));for(let i=0;i<n;i++)items.push(choose(LOOT_TABLES[table]));if(e.tier>=3&&Math.random()<.35)items.push(choose(['military_radio','keycard','medkit']));return items}
+
+  // ---------- LOOT ----------
+
+  function animateContainerOpen(root,type){return new Promise(resolve=>{if(!root||isDisposedSafe(root)){resolve();return}const groups=root.metadata?.deadhaulAnimationGroups||[],auth=groups.find(g=>['open','open_'+type].includes((g.name||'').toLowerCase()));if(auth){try{auth.start(false,1,auth.from,auth.to,false);setTimeout(resolve,420);return}catch{}}const kids=root.getChildMeshes?.()||[],lid=kids.find(m=>/lid/i.test(m.name)),drawers=kids.filter(m=>/drawer/i.test(m.name));if(lid){BABYLON.Animation.CreateAndStartAnimation('openLid',lid,'rotation.x',30,12,lid.rotation.x,lid.rotation.x-1.05,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT,null,resolve);return}if(drawers.length){drawers.forEach((d,i)=>BABYLON.Animation.CreateAndStartAnimation('openDrawer'+i,d,'position.z',30,10,d.position.z,d.position.z-.22-(i*.015),BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT));setTimeout(resolve,380);return}const y=root.position.y;BABYLON.Animation.CreateAndStartAnimation('searchNudgeUp',root,'position.y',30,5,y,y+.055,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT,null,()=>BABYLON.Animation.CreateAndStartAnimation('searchNudgeDown',root,'position.y',30,5,y+.055,y,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT,null,resolve));setTimeout(()=>{root.position.y=y;resolve()},380)})}
+  async function searchContainer(source,root,type,interaction){if(source.opening||actionBusy)return;source.opening=true;actionBusy=true;fireHeld=false;aimHeld=false;if(interaction)interaction.enabled=false;startFpAction('search_container',.46,null);await animateContainerOpen(root,type);source.opened=true;source.opening=false;actionBusy=false;stopFpAction();if(interaction)interaction.enabled=true;openLoot(source)}
+
+  function rollLoot(table,countRange=[1,3],bonus=null){const arr=LOOT_TABLES[table]||LOOT_TABLES.civilian,n=Math.floor(rand(countRange[0],countRange[1]+1)),out=[];for(let i=0;i<n;i++)out.push(choose(arr));if(bonus&&Math.random()<.55)out.push(choose(LOOT_TABLES[bonus]||[]));return out}
+  async function spawnContainer(scene,type,pos,opts={}){const info=CONTAINER_INFO[type],root=await loadModel(scene,info.model,pos,{rotationY:opts.rotationY||0,scale:opts.scale||1,collision:true});const source={name:info.label,items:rollLoot(opts.table||info.table,opts.count||info.count,opts.bonus||info.bonus),opened:false,opening:false,type,root};let interaction=null;interaction=addInteraction(root,'SEARCH '+info.label,()=>source.opened?openLoot(source):searchContainer(source,root,type,interaction),opts.range||2.6);return root}
+
+  function pickHeavy(id,mesh){if(hauledHeavy){toast('ALREADY HAULING HEAVY SALVAGE');return}hauledHeavy=id;mesh?.dispose();$('objective').innerHTML='<span>OBJECTIVE</span><b>Heavy salvage acquired. Sprint disabled until extraction.</b>';updateVitals();toast('HEAVY HAUL SECURED // MOVEMENT REDUCED')}
+
+  async function spawnLoose(scene,id,pos,model=null,scale=1){const file=model||displayModelForItem(id)||'cardboard_box';const modelScale=model?scale:(WEAPONS[id]?Math.min(scale,.72):MODEL_CONFIG.gear?.[id]?Math.min(scale,.65):scale);const root=await loadModel(scene,file,pos,{scale:modelScale,collision:false});addInteraction(root,'TAKE '+(C[id]?.name||id).toUpperCase(),()=>{const item=C[id];if(!item)return;if(!autoStoreFieldItem(id)){toast('NO AVAILABLE STORAGE');return}recalcWeight();root.dispose();playUiClick(true);toast(item.name.toUpperCase()+' SECURED')},2.35);return root}
+
+  // ---------- SCENES ----------
+  function baseScene(fog='#0a0e0d'){const s=new BABYLON.Scene(engine);s.collisionsEnabled=true;s.gravity=BABYLON.Vector3.Zero();if(havokInterface&&BABYLON.HavokPlugin){try{const plugin=new BABYLON.HavokPlugin(true,havokInterface);s.enablePhysics(new BABYLON.Vector3(0,-9.81,0),plugin);s.metadata={...(s.metadata||{}),deadhaulPhysics:true,physicsPlugin:plugin}}catch(err){console.warn('Scene physics initialization failed',err)}}s.clearColor=BABYLON.Color4.FromHexString(fog+'ff');s.fogMode=BABYLON.Scene.FOGMODE_EXP2;s.fogDensity=.009;s.fogColor=BABYLON.Color3.FromHexString(fog);s.onBeforeRenderObservable.add(()=>{controllerStep();updateInteraction();const dt=Math.min(engine.getDeltaTime()/1000,.033);bulletStep(dt);bloodStep(dt);enemyStep(dt);ragdollStep(dt);grenadeStep(dt);weaponAutoStep();updateCompass()});return s}
+  function resetRaidState(){fieldItems=[];fieldRigItems=[];fieldPocketItems=[];fieldWeight=0;hauledHeavy=null;health=100;stamina=100;playerDead=false;sprintExhausted=false;sprintReleaseSeen=false;actualSprinting=false;locomotionMoveBlend=0;locomotionSprintBlend=0;locomotionLean=0;bullets=[];enemies=[];ragdolls=[];bloodParticles=[];fireHeld=false;aimHeld=false;reloading=false;weaponKick=0;flashlightOn=false;grenades=[];actionBusy=false;activeFpAction=null;clearActionProp();resetMixamoWeaponFollowRef();updateVitals();initWeapons()}
+  function disposeCurrentScene(){weaponEditorOpen=false;customizationOpen=false;$('customizationPanel')?.classList.add('hidden');$('weaponAlignEditor')?.classList.add('hidden');disposeFirstPersonIK();for(const e of enemies){for(const c of e?.customRagdollConstraints||[])try{c?.dispose?.()}catch{}try{e?.physicsRagdoll?.dispose?.()}catch(err){console.warn('DEADHAUL ragdoll dispose warning',err)}}nearest=null;interactions=[];currentCamera=null;playerBody=null;viewWeapon=null;fpRig=null;playerWorldRig=null;playerFpBodyRig=null;playerWorldWeapon=null;playerGearRoots=[];playerFpGearRoots=[];safehouseDisplayRoots=[];safehouseCustomizationRoots=[];safehouseSceneRefs=null;clearPlayerHitboxes();playerShadowGenerator=null;flashlight=null;bullets=[];enemies=[];ragdolls=[];grenades=[];activeFpAction=null;actionBusy=false;clearActionProp();if(currentScene&&!isDisposedSafe(currentScene))currentScene.dispose();currentScene=null}
+  async function buildBunker(){stopTimer();raidStart=0;sceneMode='bunker';updateEquipmentPresentation();interactions=[];nearest=null;health=100;stamina=100;playerDead=false;sprintExhausted=false;sprintReleaseSeen=false;actualSprinting=false;fieldItems=[];fieldRigItems=[];fieldPocketItems=[];fieldWeight=0;hauledHeavy=null;updateVitals();$('raidTimer').classList.add('hidden');$('weaponHud').classList.add('hidden');$('raidInventoryMini').classList.add('hidden');$('locationLabel').textContent='BUNKER // NODE 17 // BUILD 2.6.8';$('objective').innerHTML='<span>SAFEHOUSE</span><b>Manage your stash, prepare a loadout, customize NODE 17, or deploy to the surface.</b>';const scene=baseScene('#080b0a');currentScene=scene;const concrete=mat(scene,'bunkerConcrete','#242a28'),dark=mat(scene,'bunkerDark','#101412'),floorMat=mat(scene,'bunkerFloor','#202624'),metal=mat(scene,'terminalMetal','#303a35'),screen=mat(scene,'terminalScreen','#1d392c','#244e37');box(scene,'floor',[22,.35,27],[0,-.18,0],floorMat);box(scene,'ceiling',[22,.25,27],[0,4.8,0],dark,true);box(scene,'rear',[22,5,.35],[0,2.5,-13.5],concrete);box(scene,'left',[.35,5,27],[-11,2.5,0],concrete);box(scene,'right',[.35,5,27],[11,2.5,0],concrete);box(scene,'frontL',[8.1,5,.35],[-6.95,2.5,13.5],concrete);box(scene,'frontR',[8.1,5,.35],[6.95,2.5,13.5],concrete);setupCamera(scene,[0,1.75,-7],[0,1.6,7]);const hemi=new BABYLON.HemisphericLight('ambient',new BABYLON.Vector3(0,1,0),scene);hemi.intensity=playerData.state?.has_generator?.5:.23;const p=new BABYLON.PointLight('bunkerLamp',new BABYLON.Vector3(0,4,-1),scene);p.intensity=playerData.state?.has_generator?1.5:.45;p.diffuse=new BABYLON.Color3(.75,.9,.65);p.range=24;safehouseSceneRefs={concrete,dark,floor:floorMat,hemi,lamp:p};applySafehouseVisualConfig();
+    const jobs=[];for(const z of [-9,-3,3,9]){jobs.push(loadModel(scene,'bunker_wall',[-10.8,0,z],{rotationY:Math.PI/2,collision:false}),loadModel(scene,'bunker_wall',[10.8,0,z],{rotationY:-Math.PI/2,collision:false}))}for(const x of [-6,0,6])jobs.push(loadModel(scene,'bunker_wall',[x,0,-13.3],{collision:false}));jobs.push(loadModel(scene,'blast_door',[0,0,13.15],{rotationY:Math.PI}),loadModel(scene,'workbench',[-6,0,-6],{rotationY:Math.PI/2}),loadModel(scene,'metal_shelf',[7,0,-7.5],{rotationY:-Math.PI/2}),loadModel(scene,'metal_shelf',[7,0,-3.8],{rotationY:-Math.PI/2}),loadModel(scene,'storage_crate',[5,0,5],{}),loadModel(scene,'storage_crate',[6.8,0,5],{}),loadModel(scene,'locker_bank',[-8.4,0,3.5],{rotationY:Math.PI/2}),loadModel(scene,'ceiling_light',[0,4.45,-5],{collision:false}),loadModel(scene,'ceiling_light',[0,4.45,3],{collision:false}),loadModel(scene,'ceiling_light',[0,4.45,10],{collision:false}));if(playerData.state?.has_generator)jobs.push(loadModel(scene,'portable_generator',[-5.2,0,4.5],{rotationY:Math.PI/2}));await Promise.allSettled(jobs);
+    // deployment terminal
+    box(scene,'terminalDesk',[2.7,1.05,.7],[-4.6,.52,8.8],metal,true);const mon=await loadModel(scene,'monitor',[-4.6,1.05,8.65],{rotationY:Math.PI,collision:false});const terminalScreen=box(scene,'terminalGlow',[.58,.34,.02],[-4.6,1.86,8.28],screen,false,false);const terminalTrigger=interactionTrigger(scene,'terminal',[-4.6,1.4,8.2],[3,2.7,2.5]);addInteraction(terminalTrigger,'USE DEPLOYMENT TERMINAL',openMapPanel,3.0,[-4.6,1.4,8.2]);const doorTrigger=interactionTrigger(scene,'doorSelect',[0,1.5,11.6],[5.5,3,2.4]);addInteraction(doorTrigger,'SELECT RAID',openMapPanel,3.0,[0,1.5,11.6]);const stashTrigger=interactionTrigger(scene,'stashAccess',[6.3,1.4,-5.7],[3.2,3.0,5.2]);addInteraction(stashTrigger,'ACCESS STASH / DISPLAY',openStashPanel,3.2,[6.3,1.4,-5.7]);const workTrigger=interactionTrigger(scene,'safehouseConfig',[-6,1.2,-6],[3.2,2.5,3.2]);addInteraction(workTrigger,'CUSTOMIZE BUNKER',openCustomizationPanel,3.0,[-6,1.2,-6]);await rebuildSafehouseDecor(scene);await rebuildSafehouseDisplays(scene);await loadPlayerWorldRig(scene,true);syncPlayerCharacter(.016,false,false);return scene}
+
+  async function startRaid(mapId=selectedMapId){if(transitionInProgress)return;const preparedForRaid=[...preparedBag()],preparedRigForRaid=[...preparedRig()],preparedPocketForRaid=[...preparedPockets()];const prepWeight=[...preparedForRaid,...preparedRigForRaid,...preparedPocketForRaid].reduce((n,id)=>n+(C[id]?.weight||0),0);if(prepWeight>bagCapacity()){toast('PREPARED LOADOUT OVERWEIGHT');return}if(preparedForRaid.length>backpackSlotCount()||preparedRigForRaid.length>rigSlotCount()||preparedPocketForRaid.length>4){toast('PREPARED CONTAINER OVER CAPACITY');return}transitionInProgress=true;selectedMapId=mapId;closeAllGameplayPanels();$('mapPanel').classList.add('hidden');mapOpen=false;setDeploymentLoading(true,'PREPARING '+MAPS[mapId].name.toUpperCase());const old=currentScene;let scene=null;try{equipment._bag=[];equipment._rigItems=[];equipment._pocketItems=[];await A.saveLoadout?.(equipment);resetRaidState();fieldItems=[...preparedForRaid];fieldRigItems=[...preparedRigForRaid];fieldPocketItems=[...preparedPocketForRaid];recalcWeight();sceneMode='raid';updateEquipmentPresentation();const map=MAPS[mapId];scene=baseScene(map.fog);currentScene=scene;scene.fogDensity=mapId==='clinic'?.007:.008;const ground=mat(scene,'ground_'+mapId,mapId==='checkpoint'?'#39372e':'#343832'),road=mat(scene,'road','#222725');const terrain=box(scene,'terrain',[150,.35,150],[0,-.18,0],ground,true,true);terrain.receiveShadows=true;box(scene,'roadMain',[14,.06,135],[0,.01,0],road,false,true);for(const p of [[-74,2,0],[74,2,0],[0,2,-74],[0,2,74]])collisionBox(scene,'boundary',[p[0]===0?150:.4,4,p[2]===0?150:.4],p);setupCamera(scene,map.spawn,[map.spawn[0],1.55,map.spawn[2]+18]);const sky=new BABYLON.HemisphericLight('sky',new BABYLON.Vector3(.2,1,.1),scene);sky.intensity=.72;sky.diffuse=new BABYLON.Color3(.62,.68,.63);const sun=new BABYLON.DirectionalLight('sun',new BABYLON.Vector3(-.4,-1,.28),scene);sun.intensity=.32;sun.diffuse=new BABYLON.Color3(.8,.72,.62);try{playerShadowGenerator=new BABYLON.ShadowGenerator(1024,sun);playerShadowGenerator.useBlurExponentialShadowMap=true;playerShadowGenerator.blurKernel=16}catch{playerShadowGenerator=null}await Promise.all([populateMap(scene,mapId),loadPlayerWorldRig(scene,true),loadFirstPersonRig(scene)]);createExtraction(scene,map.extract,map.name);if(old&&old!==scene&&!isDisposedSafe(old))old.dispose();$('locationLabel').textContent=`SURFACE // ${map.name.toUpperCase()} // BUILD 2.6.8`;$('objective').innerHTML='<span>OBJECTIVE</span><b>Search useful locations, survive contact, and extract with what you can carry.</b>';$('raidTimer').classList.remove('hidden');$('raidInventoryMini').classList.remove('hidden');raidStart=Date.now();startTimer();await loadViewWeapon();const enteringWeapon=getActiveWeapon();if(enteringWeapon)startFpAction('equip',.5,enteringWeapon.id);setDeploymentLoading(false);transitionInProgress=false;canvas.focus();canvas.requestPointerLock?.();toast('SURFACE LINK ESTABLISHED')}catch(err){console.error('Deployment failed',err);transitionInProgress=false;setDeploymentLoading(false);if(scene&&scene!==old&&!isDisposedSafe(scene))scene.dispose();if(old&&!isDisposedSafe(old)){currentScene=old;currentCamera=old.activeCamera;playerBody=old.getMeshByName?.('playerBody');sceneMode='bunker'}if(preparedForRaid.length||preparedRigForRaid.length||preparedPocketForRaid.length){equipment._bag=[...preparedForRaid];equipment._rigItems=[...preparedRigForRaid];equipment._pocketItems=[...preparedPocketForRaid];try{await A.saveLoadout?.(equipment)}catch{}}toast('DEPLOYMENT FAILED // '+(err.message||err),3200)}}
+  function setDeploymentLoading(show,msg='PREPARING RAID'){$('deploymentStatus').textContent=msg;$('deploymentOverlay').classList.toggle('hidden',!show)}
+  function createExtraction(scene,pos,zone){const green=mat(scene,'extract','#31472d','#334d26');const ex=BABYLON.MeshBuilder.CreateCylinder('extraction',{diameter:5.5,height:.10,tessellation:32},scene);ex.position=new BABYLON.Vector3(...pos);ex.material=green;ex.checkCollisions=false;const flare=new BABYLON.PointLight('flare',new BABYLON.Vector3(pos[0],1.2,pos[2]),scene);flare.diffuse=new BABYLON.Color3(.47,.9,.34);flare.intensity=2.4;flare.range=14;addInteraction(ex,'EXTRACT',()=>completeExtraction(zone),4.5,[pos[0],1.1,pos[2]])}
+
+  async function populateMap(scene,id){if(id==='industrial')return buildIndustrial(scene);if(id==='clinic')return buildClinic(scene);return buildCheckpoint(scene)}
+  async function buildIndustrial(scene){const jobs=[loadModel(scene,'warehouse',[-25,0,8],{}),loadModel(scene,'gas_station',[29,0,-14],{rotationY:Math.PI/2}),loadModel(scene,'gas_canopy',[25,0,5],{rotationY:Math.PI/2,collision:false}),loadModel(scene,'forklift',[-17,0,-8],{rotationY:-.25}),loadModel(scene,'wrecked_pickup',[19,0,25],{rotationY:.72}),loadModel(scene,'dumpster',[-8,0,20],{rotationY:.2}),loadModel(scene,'hand_truck',[-29,0,17],{rotationY:-.4})];for(let x=-44;x<=-9;x+=5)jobs.push(loadModel(scene,'chainlink_fence',[x,0,31],{}));for(let z=-2;z<=26;z+=5)jobs.push(loadModel(scene,'chainlink_fence',[-46,0,z],{rotationY:Math.PI/2}));for(const p of [[-36,0,1],[-33,0,1],[-30,0,1],[-36,0,5],[-33,0,5]])jobs.push(loadModel(scene,'pallet',p,{collision:true}));for(const p of [[-36,0,11],[-33.5,0,11],[-31,0,11]])jobs.push(loadModel(scene,'barrel',p,{}));for(const p of [[-5,0,24],[-2,0,24],[1,0,24],[4,0,24]])jobs.push(loadModel(scene,'concrete_barrier',p,{rotationY:Math.PI/2}));for(const p of [[-51,0,-15],[-45,0,-22],[-40,0,36],[-8,0,36],[42,0,17],[43,0,-7],[34,0,-31]])jobs.push(loadModel(scene,'bush',p,{collision:false,scale:rand(.8,1.2)}));await Promise.allSettled(jobs);
+    await Promise.allSettled([spawnContainer(scene,'tools',[-34,0,14],{rotationY:Math.PI}),spawnContainer(scene,'tools',[-29.5,0,14],{rotationY:Math.PI}),spawnContainer(scene,'crate',[-21,0,14],{}),spawnContainer(scene,'duffel',[31,0,-11],{}),spawnContainer(scene,'filing',[26,0,-12],{rotationY:Math.PI/2}),spawnContainer(scene,'crate',[22,0,7],{}),spawnLoose(scene,'copper_wire',[-33,.35,-3]),spawnLoose(scene,'fuel_can',[24,.35,8]),spawnLoose(scene,'ssd',[27,.9,-10])]);const gen=await loadModel(scene,'portable_generator',[-20,0,17],{rotationY:.2});addInteraction(gen,'HAUL PORTABLE GENERATOR',()=>pickHeavy('portable_generator',gen),3.2);createEnemy(scene,[-37,0,18],{tier:2,lootProfile:'industrial'});createEnemy(scene,[34,0,15],{tier:2,lootProfile:'industrial'});createEnemy(scene,[12,0,-7],{tier:1,lootProfile:'civilian'});createEnemy(scene,[-10,0,-24],{tier:1,lootProfile:'civilian'})}
+  async function buildClinic(scene){await Promise.allSettled([loadModel(scene,'clinic_building',[0,0,4],{}),loadModel(scene,'wrecked_pickup',[20,0,-20],{rotationY:-.5}),loadModel(scene,'dumpster',[-17,0,-7],{rotationY:.1}),loadModel(scene,'warning_sign',[7,0,-30],{rotationY:Math.PI})]);const furniture=[];for(const p of [[-8,0,8],[-8,0,3],[-8,0,-3],[8,0,8],[8,0,3]])furniture.push(loadModel(scene,'hospital_bed',p,{rotationY:Math.PI/2}));for(const p of [[-1.3,0,8],[-1.3,0,-7],[7,0,-6]])furniture.push(loadModel(scene,'office_desk',p,{rotationY:Math.PI/2}));for(const p of [[-10,0,10],[-10,0,5],[-10,0,0],[-10,0,-5],[10,0,9],[10,0,4]])furniture.push(loadModel(scene,'chair',p,{rotationY:rand(0,Math.PI*2)}));for(const p of [[-20,0,-20],[-24,0,-8],[18,0,18],[25,0,4]])furniture.push(loadModel(scene,'bush',p,{collision:false,scale:1.1}));await Promise.allSettled(furniture);await Promise.allSettled([spawnContainer(scene,'medical',[-7,0,9],{}),spawnContainer(scene,'medical',[-7,0,3],{}),spawnContainer(scene,'medical',[7,0,8],{}),spawnContainer(scene,'filing',[-1,0,10],{rotationY:Math.PI/2}),spawnContainer(scene,'filing',[7,0,-8],{rotationY:Math.PI/2}),spawnContainer(scene,'duffel',[1,0,-5],{}),spawnLoose(scene,'bandage',[-8,.85,8]),spawnLoose(scene,'morphine',[8,.8,3]),spawnLoose(scene,'keycard',[-1.3,.9,8])]);createEnemy(scene,[-5,0,-1],{tier:2,weapon:'mp5',lootProfile:'civilian'});createEnemy(scene,[6,0,5],{tier:2,weapon:'glock17',lootProfile:'civilian'});createEnemy(scene,[0,0,14],{tier:1,weapon:'makarov',lootProfile:'civilian'});createEnemy(scene,[-17,0,-15],{tier:1,weapon:'sks',lootProfile:'civilian'});createEnemy(scene,[18,0,18],{tier:2,weapon:'ak74',lootProfile:'military'})}
+  async function buildCheckpoint(scene){const jobs=[];for(const x of [-16,16])jobs.push(loadModel(scene,'military_tent',[x,0,4],{rotationY:x<0?.15:-.15,collision:false}));jobs.push(loadModel(scene,'guard_tower',[-28,0,18],{collision:true}),loadModel(scene,'road_gate',[0,0,-13],{}),loadModel(scene,'wrecked_pickup',[12,0,-24],{rotationY:.35}),loadModel(scene,'warning_sign',[-7,0,-18],{}));for(const p of [[-7,0,-8],[0,0,-8],[7,0,-8],[-9,0,20],[0,0,20],[9,0,20]])jobs.push(loadModel(scene,'sandbag_wall',p,{}));for(const p of [[-40,0,-16],[40,0,-10],[-43,0,30],[45,0,26]])jobs.push(loadModel(scene,'bush',p,{collision:false}));await Promise.allSettled(jobs);await Promise.allSettled([spawnContainer(scene,'weapon',[-16,0,5],{}),spawnContainer(scene,'ammo',[-13.5,0,5],{}),spawnContainer(scene,'locker',[16,0,4],{}),spawnContainer(scene,'ammo',[19,0,5],{}),spawnContainer(scene,'duffel',[-27,0,18],{}),spawnLoose(scene,'military_radio',[15,.65,3],'cardboard_box',.55),spawnLoose(scene,'keycard',[-28,.8,18])]);createEnemy(scene,[0,0,2],{tier:3,weapon:'m4a1',lootProfile:'military'});createEnemy(scene,[-18,0,12],{tier:2,weapon:'ak74',lootProfile:'military'});createEnemy(scene,[18,0,12],{tier:2,weapon:'mp5',lootProfile:'military'});createEnemy(scene,[-30,0,17],{tier:3,weapon:'sks',lootProfile:'military'});createEnemy(scene,[5,0,28],{tier:2,weapon:'ak74',lootProfile:'military'});createEnemy(scene,[23,0,-20],{tier:1,weapon:'pump12',lootProfile:'military'})}
+
+  // ---------- RAID END ----------
+  function startTimer(){stopTimer();const tick=()=>{$('raidTimer').textContent=formatTime((Date.now()-raidStart)/1000)};tick();timerHandle=setInterval(tick,250)}function stopTimer(){if(timerHandle)clearInterval(timerHandle);timerHandle=null}
+  async function completeExtraction(zone){if(playerDead||transitionInProgress)return;const duration=Math.max(1,Math.floor((Date.now()-raidStart)/1000));stopTimer();releasePointer();try{const extracted=[...allFieldItems(),...(hauledHeavy?[hauledHeavy]:[])];await A.completeRaid({zone,duration_seconds:duration,items:extracted});await A.saveLoadout?.(equipment);const value=extracted.reduce((n,id)=>n+(C[id]?.value||0),0);$('extractStats').innerHTML=`<div><span>DURATION</span><b>${formatTime(duration)}</b></div><div><span>ITEMS</span><b>${extracted.length}</b></div><div><span>RECOVERED</span><b>$${value.toLocaleString()}</b></div>`;$('extractOverlay').classList.remove('hidden')}catch(err){toast('SAVE FAILED // '+(err.message||err),3200);startTimer()}}
+  async function returnToBunker(){const btn=$('returnBunker');if(btn)btn.disabled=true;try{playerData=await A.getPlayerData();equipment={...(playerData.loadout||A.defaultLoadout||{})};preparedBag();initWeapons();disposeCurrentScene();await buildBunker();$('extractOverlay').classList.add('hidden');$('deathOverlay').classList.add('hidden');canvas.focus()}catch(err){console.error(err);toast('BUNKER LOAD FAILED // '+err.message,3000)}finally{if(btn)btn.disabled=false}}
+
+  // ---------- LIVE WEAPON ALIGNMENT EDITOR ----------
+  const degToRad=d=>Number(d||0)*Math.PI/180,radToDeg=r=>Number(r||0)*180/Math.PI;
+  function editorWeaponId(){return getActiveWeapon()?.id||null}
+  function ensureMixamoMount(id){
+    if(!id||!MODEL_CONFIG.weapons?.[id])return null;
+    const m=MODEL_CONFIG.weapons[id].mixamoFp||(MODEL_CONFIG.weapons[id].mixamoFp={});
+    const profile=ch15WeaponMountProfile(id);
+    if(!Array.isArray(m.position))m.position=arr3(profile.position);
+    if(!Array.isArray(m.rotation))m.rotation=arr3(profile.rotation);
+    if(!Number.isFinite(Number(m.scale)))m.scale=Number(profile.scale??1);
+    if(!m.wristCorrection)m.wristCorrection={right:[0,0,0],left:[0,0,0]};
+    if(!Array.isArray(m.wristCorrection.right))m.wristCorrection.right=[0,0,0];
+    if(!Array.isArray(m.wristCorrection.left))m.wristCorrection.left=[0,0,0];
+    return m;
+  }
+  function editorFieldMap(){return{
+    posX:['position',0,1],posY:['position',1,1],posZ:['position',2,1],
+    rotX:['rotation',0,Math.PI/180],rotY:['rotation',1,Math.PI/180],rotZ:['rotation',2,Math.PI/180],
+    wristRX:['wristRight',0,Math.PI/180],wristRY:['wristRight',1,Math.PI/180],wristRZ:['wristRight',2,Math.PI/180],
+    wristLX:['wristLeft',0,Math.PI/180],wristLY:['wristLeft',1,Math.PI/180],wristLZ:['wristLeft',2,Math.PI/180]
+  }}
+  function mountValueForEditor(m,key){const map=editorFieldMap()[key];if(!map)return 0;const [group,i,factor]=map;if(group==='position')return Number(m.position?.[i]||0);if(group==='rotation')return radToDeg(m.rotation?.[i]||0);if(group==='wristRight')return radToDeg(m.wristCorrection?.right?.[i]||0);if(group==='wristLeft')return radToDeg(m.wristCorrection?.left?.[i]||0);return 0}
+  function setMountValueFromEditor(m,key,value){const map=editorFieldMap()[key];if(!map)return;const [group,i,factor]=map,v=Number(value)||0;if(group==='position')m.position[i]=v;else if(group==='rotation')m.rotation[i]=v*factor;else if(group==='wristRight')m.wristCorrection.right[i]=v*factor;else if(group==='wristLeft')m.wristCorrection.left[i]=v*factor}
+  function syncWeaponEditorUi(){
+    const id=editorWeaponId(),m=ensureMixamoMount(id),title=$('alignWeaponName');if(title)title.textContent=id?(C[id]?.name||id).toUpperCase():'NO WEAPON';
+    const status=$('alignStatus');if(status)status.textContent=id?(weaponEditorSaved[id]?'BROWSER OVERRIDE SAVED':'LIVE / UNSAVED'):'EQUIP A WEAPON';
+    if(!m)return;
+    document.querySelectorAll('[data-align-field]').forEach(el=>{const k=el.dataset.alignField,v=mountValueForEditor(m,k);el.value=Number(v.toFixed(k.startsWith('rot')||k.startsWith('wrist')?2:4))});
+    const scale=$('alignScale');if(scale)scale.value=Number(m.scale??1).toFixed(3);
+  }
+  function applyEditorInput(el){const id=editorWeaponId(),m=ensureMixamoMount(id);if(!m)return;if(el.id==='alignScale')m.scale=clamp(Number(el.value)||1,.05,4);else setMountValueFromEditor(m,el.dataset.alignField,el.value);syncWeaponEditorUi()}
+  function nudgeEditorField(key,delta){const id=editorWeaponId(),m=ensureMixamoMount(id);if(!m)return;if(key==='scale')m.scale=clamp(Number(m.scale||1)+delta,.05,4);else{const now=mountValueForEditor(m,key);setMountValueFromEditor(m,key,now+delta)}syncWeaponEditorUi()}
+  function openWeaponEditor(){
+    if(sceneMode!=='raid'||selectedCharacter!=='player_ch15'||!getActiveWeapon()){toast('ALIGNMENT EDITOR REQUIRES CH15 + A WEAPON');return}
+    closeAllGameplayPanels();if(settingsOpen){$('settingsPanel').classList.add('hidden');settingsOpen=false}weaponEditorOpen=true;aimHeld=false;fireHeld=false;keys.shift=false;actualSprinting=false;$('weaponAlignEditor')?.classList.remove('hidden');releasePointer();syncWeaponEditorUi();toast('WEAPON ALIGNMENT // LIVE');
+  }
+  function closeWeaponEditor(){if(!weaponEditorOpen)return;weaponEditorOpen=false;$('weaponAlignEditor')?.classList.add('hidden');calibrateMixamoWeaponFollowRef();resumePointer()}
+  function toggleWeaponEditor(){weaponEditorOpen?closeWeaponEditor():openWeaponEditor()}
+  function resetWeaponEditor(original=true){const id=editorWeaponId();if(!id)return;const src=original?(ORIGINAL_WEAPON_MOUNTS[id]||{}):{position:[0,-.20,.70],rotation:[0,Math.PI,0],scale:.75,wristCorrection:{right:[0,0,0],left:[0,0,0]}};MODEL_CONFIG.weapons[id].mixamoFp=JSON.parse(JSON.stringify(src));syncWeaponEditorUi();toast(original?'ORIGINAL CONFIG RESTORED':'WEAPON CENTERED')}
+  function saveWeaponEditorBrowser(){const id=editorWeaponId(),m=ensureMixamoMount(id);if(!id||!m)return;weaponEditorSaved[id]=JSON.parse(JSON.stringify(m));localStorage.setItem(WEAPON_EDITOR_STORAGE_KEY,JSON.stringify(weaponEditorSaved));syncWeaponEditorUi();toast('ALIGNMENT SAVED IN THIS BROWSER')}
+  function clearWeaponEditorBrowser(){const id=editorWeaponId();if(!id)return;delete weaponEditorSaved[id];localStorage.setItem(WEAPON_EDITOR_STORAGE_KEY,JSON.stringify(weaponEditorSaved));resetWeaponEditor(true);toast('BROWSER OVERRIDE CLEARED')}
+  async function copyWeaponEditorConfig(){const id=editorWeaponId(),m=ensureMixamoMount(id);if(!id||!m)return;const clean={position:arr3(m.position).map(v=>+v.toFixed(5)),rotation:arr3(m.rotation).map(v=>+v.toFixed(5)),scale:+Number(m.scale??1).toFixed(4),wristCorrection:{right:arr3(m.wristCorrection?.right).map(v=>+v.toFixed(5)),left:arr3(m.wristCorrection?.left).map(v=>+v.toFixed(5))}};const txt='"mixamoFp": '+JSON.stringify(clean,null,2);try{await navigator.clipboard.writeText(txt);toast('CONFIG COPIED TO CLIPBOARD')}catch{const out=$('alignCopyOutput');if(out){out.value=txt;out.classList.remove('hidden');out.select()}toast('COPY BLOCK SHOWN BELOW')}}
+
+  // ---------- INPUT ----------
+  function setMove(e,down){const k=(e.key||'').toLowerCase();if(['w','a','s','d'].includes(k)){keys[k]=down;e.preventDefault();return true}if(k==='shift'){keys.shift=down;e.preventDefault();return true}return false}
+  window.addEventListener('keydown',e=>{
+    if(e.key==='F6'){e.preventDefault();if(!e.repeat)toggleWeaponEditor();return}
+    if(e.key==='Tab'){e.preventDefault();if(!e.repeat)toggleInventory();return}
+    if(e.key==='Escape'){e.preventDefault();if(weaponEditorOpen){closeWeaponEditor();return}if(document.pointerLockElement===canvas)return;if(inventoryOpen)return closePanel('inventoryPanel');if(stashOpen)return closePanel('stashPanel');if(customizationOpen)return closePanel('customizationPanel');if(lootOpen)return closePanel('lootPanel');if(mapOpen)return closePanel('mapPanel');if(settingsOpen)return closePanel('settingsPanel');if(!anyPanelOpen())openSettings();return}
+    if(anyPanelOpen()||playerDead)return;
+    if(setMove(e,true))return;
+    if((e.key===' '||e.code==='Space')&&!e.repeat){e.preventDefault();jumpQueued=true;return}
+    const k=(e.key||'').toLowerCase();if(k==='e'&&!e.repeat){e.preventDefault();if(actionBusy)return;updateInteraction();if(nearest){try{nearest.fn()}catch(err){toast('INTERACTION FAILED // '+err.message)}}return}if(k==='r'&&!e.repeat){startReload();return}if(k==='g'&&!e.repeat){throwGrenade();return}if(k==='t'&&!e.repeat){flashlightOn=!flashlightOn;syncFlashlight();toast('FLASHLIGHT '+(flashlightOn?'ON':'OFF'));return}if(k==='1'&&!e.repeat){switchWeapon('primary');return}if(k==='2'&&!e.repeat){switchWeapon('secondary');return}
+  });
+  window.addEventListener('keyup',e=>setMove(e,false));window.addEventListener('blur',()=>{for(const k of Object.keys(keys))keys[k]=false;fireHeld=false});
+  canvas.addEventListener('mousedown',e=>{if(anyPanelOpen()||playerDead)return;if(e.button===0){fireHeld=true;fireWeapon(true)}if(e.button===2){aimHeld=true;e.preventDefault()}});canvas.addEventListener('mouseup',e=>{if(e.button===0)fireHeld=false;if(e.button===2)aimHeld=false});canvas.addEventListener('contextmenu',e=>e.preventDefault());
+  function weaponAutoStep(){const w=getActiveWeapon();if(fireHeld&&w?.auto)fireWeapon(false)}
+  document.addEventListener('pointerlockchange',()=>{if(suppressPointerSettings||transitionInProgress)return;const active=$('startOverlay').classList.contains('hidden')&&$('extractOverlay').classList.contains('hidden')&&$('deathOverlay').classList.contains('hidden');if(active&&document.pointerLockElement!==canvas&&!anyPanelOpen())openSettings()});
+
+  async function setCharacterModel(id){if(!MODEL_CONFIG.characters?.[id])return;selectedCharacter=id;localStorage.setItem('deadhaul_character',id);if($('characterSelect'))$('characterSelect').value=id;if(sceneMode==='raid'&&currentScene&&playerBody){await loadPlayerWorldRig(currentScene,true);if(fpRig){disposeFirstPersonIK();try{fpRig.root.dispose(false,true)}catch{}fpRig=null}await loadViewWeapon();updateEquipmentPresentation();toast((MODEL_CONFIG.characters[id].label||id).toUpperCase()+' ACTIVE')}}
+  function populateCharacterSelector(){const sel=$('characterSelect');if(!sel)return;sel.innerHTML=Object.entries(MODEL_CONFIG.characters||{}).map(([id,c])=>`<option value="${id}">${c.label||id}</option>`).join('');if(MODEL_CONFIG.characters?.[selectedCharacter])sel.value=selectedCharacter;else{selectedCharacter=sel.value||selectedCharacter;localStorage.setItem('deadhaul_character',selectedCharacter)}}
+
+  // ---------- SETTINGS / COMPASS ----------
+  function setSensitivity(v){mouseSensitivity=clamp(Number(v)||1,.2,3);localStorage.setItem(SENSITIVITY_KEY,String(mouseSensitivity));$('sensitivitySlider').value=mouseSensitivity;$('sensitivityValue').textContent=mouseSensitivity.toFixed(2)+'x';applySensitivity()}
+  function setFov(v){fieldFov=clamp(Number(v)||88,70,105);localStorage.setItem(FOV_KEY,String(fieldFov));$('fovSlider').value=fieldFov;$('fovValue').textContent=Math.round(fieldFov)+'°';if(currentCamera&&!aimHeld)currentCamera.fov=fieldFov*Math.PI/180}
+  function updateCompass(){if(!currentCamera)return;let deg=((currentCamera.rotation.y*180/Math.PI)%360+360)%360;const dirs=['N','NE','E','SE','S','SW','W','NW'];$('compass').textContent=`${dirs[Math.round(deg/45)%8]}  ${Math.round(deg).toString().padStart(3,'0')}°`}
+
+  // ---------- EVENTS ----------
+  $('enterGame').addEventListener('click',()=>{$('startOverlay').classList.add('hidden');canvas.focus();canvas.requestPointerLock?.()});$('settingsButton').addEventListener('click',openSettings);$('alignButton')?.addEventListener('click',toggleWeaponEditor);$('alignClose')?.addEventListener('click',closeWeaponEditor);$('alignCenter')?.addEventListener('click',()=>resetWeaponEditor(false));$('alignReset')?.addEventListener('click',()=>resetWeaponEditor(true));$('alignSaveBrowser')?.addEventListener('click',saveWeaponEditorBrowser);$('alignClearBrowser')?.addEventListener('click',clearWeaponEditorBrowser);$('alignCopy')?.addEventListener('click',copyWeaponEditorConfig);document.querySelectorAll('[data-align-field],#alignScale').forEach(el=>el.addEventListener('input',()=>applyEditorInput(el)));document.querySelectorAll('[data-align-nudge]').forEach(b=>b.addEventListener('click',()=>nudgeEditorField(b.dataset.alignNudge,Number(b.dataset.alignDelta||0))));$('inventoryButton').addEventListener('click',toggleInventory);$('deploySelected').addEventListener('click',()=>startRaid(selectedMapId));$('takeAllLoot').addEventListener('click',takeAllLoot);$('returnBunker').addEventListener('click',returnToBunker);$('returnAfterDeath').addEventListener('click',returnToBunker);$('sensitivitySlider').addEventListener('input',e=>setSensitivity(e.target.value));$('fovSlider').addEventListener('input',e=>setFov(e.target.value));$('characterSelect')?.addEventListener('change',e=>setCharacterModel(e.target.value));document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>closePanel(b.dataset.close)));canvas.addEventListener('click',()=>{if(!anyPanelOpen()&&$('startOverlay').classList.contains('hidden')&&!playerDead)canvas.requestPointerLock?.()});window.addEventListener('resize',()=>{engine.resize();previewEngine?.resize()});
+
+  async function commitSafehouseCustomization(){saveSafehouseConfig();applySafehouseVisualConfig();renderCustomizationPanel();await rebuildSafehouseDecor(currentScene);playUiClick(true)}
+  $('safehouseTheme')?.addEventListener('change',e=>{safehouseConfig.theme=e.target.value;commitSafehouseCustomization()});
+  $('safehouseFloor')?.addEventListener('change',e=>{safehouseConfig.floor=e.target.value;commitSafehouseCustomization()});
+  $('safehouseLampColor')?.addEventListener('change',e=>{safehouseConfig.lampColor=e.target.value;saveSafehouseConfig();applySafehouseVisualConfig();renderCustomizationPanel();playUiClick(true)});
+  $('safehouseLight')?.addEventListener('input',e=>{safehouseConfig.light=Number(e.target.value);saveSafehouseConfig();applySafehouseVisualConfig();renderCustomizationPanel()});
+  $('safehouseDecor')?.addEventListener('change',e=>{safehouseConfig.decor=e.target.value;commitSafehouseCustomization()});
+  $('safehouseClutter')?.addEventListener('change',e=>{safehouseConfig.clutter=e.target.value;commitSafehouseCustomization()});
+  $('safehouseReset')?.addEventListener('click',()=>{safehouseConfig={...safehouseConfig,theme:'concrete',floor:'sealed',lampColor:'white',light:.82,decor:'survival',clutter:'normal'};commitSafehouseCustomization();toast('BUNKER STYLE RESET')});
+  $('autoDisplayLoot')?.addEventListener('click',autoDisplayBestLoot);$('clearDisplayLoot')?.addEventListener('click',clearDisplayLoot);
+  document.addEventListener('pointerdown',e=>{if(e.target?.closest?.('button,.map-card,select'))playUiClick(false)},{capture:true});
+
+  setSensitivity(mouseSensitivity);setFov(fieldFov);populateCharacterSelector();renderMaps();initWeapons();preparedBag();updateEquipmentPresentation();currentScene=await buildBunker();engine.runRenderLoop(()=>{if(currentScene&&!isDisposedSafe(currentScene))currentScene.render()});
+})();
