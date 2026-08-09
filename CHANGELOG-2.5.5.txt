@@ -1,9 +1,0 @@
-DEADHAUL BUILD 2.5.7 — MIXAMO HAND-FOLLOW WEAPON MOUNT
-
-- Mixamo remains the sole owner of Ch15 first-person arm animation; IK is still disabled.
-- The first-person weapon now follows the animated Mixamo right hand every frame instead of staying at one fixed camera point.
-- Weapon rotation follows the changing two-hand rifle axis, so sprint/run/high-ready/ADS motion carries the gun with the hands.
-- F6 remains a neutral-pose alignment editor: tune mixamoFp in rifle idle, then the runtime carries that tuned mount through the other authored clips.
-- Vector neutral mount set to user values: position [0.12,-0.25,0.44], rotation [0,3.14159,0], scale 0.75.
-- Extra code sway is disabled while authored hand-follow is active to prevent the gun slipping away from the animated hands.
-- Local test port: 8800.
