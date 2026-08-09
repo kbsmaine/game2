@@ -1,0 +1,9 @@
+DEADHAUL Build 2.6.14 — Raid Prep UI Restyle
+
+- Reworked the main inventory/stash/magazine UI styling to match the selected dark tactical DEADHAUL raid-prep reference.
+- Added stronger black/olive/amber palette, thin metallic borders, denser item-grid cards, and a top navigation feel.
+- Restyled player inventory, stash, magazine management, loot, admin, map and settings panels for a more consistent premium looter-shooter interface.
+- Added stash category tabs/search markup to the Quartermaster panel.
+- All gameplay systems from 2.6.13 are retained: persistent magazines, loose ammo, mixed shells, rigs/backpacks/plates, animated enemies, stash, admin panel, weapon alignment, and weapon view fix.
+
+Local port: 8817

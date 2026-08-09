@@ -7,13 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/game.css?v=2.6.10" />
+  <link rel="stylesheet" href="css/game.css?v=2.6.14" />
 </head>
-<body>
+<body class="deadhaul-raidprep-theme">
   <canvas id="renderCanvas" tabindex="0"></canvas>
   <div id="gameUi">
     <div class="top-hud">
-      <div class="brandHud"><b>DEADHAUL <small>BUILD 2.6.10</small></b><span id="locationLabel">BUNKER // NODE 17</span></div>
+      <div class="brandHud"><b>DEADHAUL <small>BUILD 2.6.14</small></b><span id="locationLabel">BUNKER // NODE 17</span></div>
       <div class="raid-center"><div id="raidTimer" class="raid-timer hidden">00:00</div><div id="compass">N</div></div>
       <div class="hud-actions"><button id="inventoryButton" type="button">TAB // INVENTORY</button><button id="alignButton" type="button">ALIGN [F6]</button><button id="adminButton" type="button">ADMIN [F7]</button><button id="settingsButton" type="button">SETTINGS</button><a href="command.html">COMMAND</a></div>
     </div>
@@ -44,7 +44,7 @@
       <div class="start-card">
         <span>// GAME CLIENT</span>
         <h1>NODE 17</h1>
-        <p><b>BUILD 2.6.10 — ADMIN TEST PANEL + TACTICAL INVENTORY</b><br>WASD move · SHIFT sprint · SPACE jump · Mouse aim · LMB fire · RMB aim · R reload · E interact · TAB inventory · F7 admin · G grenade · T flashlight · ESC settings</p>
+        <p><b>BUILD 2.6.14 — ADMIN TEST PANEL + TACTICAL INVENTORY</b><br>WASD move · SHIFT sprint · SPACE jump · Mouse aim · LMB fire · RMB aim · R reload · E interact · TAB inventory · F7 admin · G grenade · T flashlight · ESC settings</p>
         <button id="enterGame">ENTER BUNKER</button>
       </div>
     </div>
@@ -148,6 +148,20 @@
           </section>
           <section class="stash-storage-panel">
             <div class="bag-head"><div><span>RECOVERED INVENTORY</span><b id="stashCount">0 ITEMS</b></div><small>Everything you successfully extract with remains available here.</small></div>
+            <div class="dh-stash-toolbar">
+              <div class="dh-stash-tabs" aria-label="Stash categories">
+                <button type="button" data-stash-category="all" class="active">ALL</button>
+                <button type="button" data-stash-category="weapons">WEAPONS</button>
+                <button type="button" data-stash-category="magazines">MAGS</button>
+                <button type="button" data-stash-category="ammo">AMMO</button>
+                <button type="button" data-stash-category="armor">ARMOR</button>
+                <button type="button" data-stash-category="rigs">RIGS</button>
+                <button type="button" data-stash-category="backpacks">BACKPACKS</button>
+                <button type="button" data-stash-category="medical">MEDS</button>
+                <button type="button" data-stash-category="valuables">VALUABLES</button>
+              </div>
+              <div class="dh-stash-search"><input id="stashSearch" type="search" placeholder="Search stash..." autocomplete="off"><button type="button">SORT</button></div>
+            </div>
             <div id="stashGridGame" class="bag-grid stash-grid-game"></div>
           </section>
           <section class="stash-display-panel">
