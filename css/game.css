@@ -37,7 +37,7 @@
 @media(max-width:800px){.customization-layout{grid-template-columns:1fr}.customization-preview-card{border-right:0;border-bottom:1px solid #303a35}.customization-controls{grid-template-columns:1fr}.customization-controls .safehouse-setting:nth-child(4),.customization-controls .safehouse-action{grid-column:auto}.stash-display-panel{display:block}}
 
 
-/* Build 2.6.8 — Tarkov-style tactical container UI */
+/* Build 2.6.9 — Tarkov-style tactical container UI */
 .inventory-shell{width:min(1560px,98vw);height:min(930px,96vh)}
 .tarkov-inventory-layout{grid-template-columns:330px minmax(330px,.8fr) minmax(520px,1.35fr);background:#080b09;overflow:hidden}
 .tarkov-equipment-panel{padding:13px;border-right:1px solid #26312b;background:linear-gradient(180deg,#0d120f,#090c0a)}
@@ -53,3 +53,14 @@
 .stash-grid-game{grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:5px}.stash-grid-game .item-card{min-height:166px;padding:6px}.stash-grid-game .item-thumb{height:68px}.stash-grid-game .item-card b{font-size:12px}.stash-grid-game .item-card small{font-size:6px}
 @media(max-width:1250px){.tarkov-inventory-layout{grid-template-columns:300px minmax(280px,.65fr) minmax(430px,1fr)}.t-container-grid{grid-template-columns:repeat(4,minmax(68px,1fr))}}
 @media(max-width:900px){.inventory-shell{overflow:auto}.tarkov-inventory-layout{display:block;overflow:auto}.tarkov-character-panel canvas{height:420px}.tactical-containers-panel{overflow:visible}.t-container-grid,.t-container-grid.rig-grid,.t-container-grid.backpack-grid{grid-template-columns:repeat(4,minmax(70px,1fr))}}
+
+
+/* Build 2.6.9 — developer/admin item testing panel */
+.admin-shell{width:min(1500px,97vw);height:min(900px,95vh);background:linear-gradient(145deg,#101512fa,#080b09fa)}
+.admin-toolbar{display:grid;grid-template-columns:minmax(280px,1.5fr) minmax(170px,.65fr) minmax(110px,.35fr) minmax(190px,.65fr);gap:9px;padding:13px 18px;border-bottom:1px solid #2d3832;background:#0b100d}
+.admin-toolbar>div{min-width:0}.admin-toolbar label{display:block;font-size:6px;color:#76837b;letter-spacing:.12em;margin-bottom:5px}.admin-toolbar input,.admin-toolbar select{width:100%;height:34px;border:1px solid #3a4740;background:#111713;color:#dce2dd;padding:0 9px;font:600 9px var(--mono);outline:0}.admin-toolbar input:focus,.admin-toolbar select:focus{border-color:#97ae68}.admin-toolbar input::placeholder{color:#59655e}
+.admin-quickbar{display:flex;gap:6px;align-items:center;padding:8px 18px;border-bottom:1px solid #29342e;background:#0d120f;overflow-x:auto}.admin-quickbar button{white-space:nowrap;border:1px solid #4c5c51;background:#151d18;color:#d2dad4;padding:7px 9px;font:700 8px var(--cond);letter-spacing:.05em}.admin-quickbar button:hover{border-color:#98ad6b;color:#edffd2;background:#1b271a}.admin-quickbar span{margin-left:auto;white-space:nowrap;font-size:6px;color:#66736b}
+.admin-grid-head{display:flex;justify-content:space-between;align-items:end;padding:10px 18px 6px}.admin-grid-head span{font-size:7px;color:#77837b;letter-spacing:.12em}.admin-grid-head b{font:700 13px var(--cond)}
+.admin-item-grid{padding:6px 18px 18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:6px;overflow:auto;flex:1;align-content:start}.admin-item-card{min-height:168px;border:1px solid #303c35;background:linear-gradient(145deg,#121815,#090d0b);padding:7px;display:grid;grid-template-rows:82px auto auto auto 1fr auto;position:relative}.admin-item-card.rare{border-color:#49645d}.admin-item-card.epic{border-color:#685a77}.admin-item-card.heavy{border-color:#7a5c40}.admin-item-card img{width:100%;height:82px;object-fit:contain;background:#070a08;border:1px solid #202923;padding:5px}.admin-item-card>span{font-size:6px;color:#718078;letter-spacing:.08em;margin-top:5px}.admin-item-card>b{font:700 13px/1.05 var(--cond);margin-top:2px}.admin-item-card small{font-size:6px;color:#6f7c74;margin-top:3px;line-height:1.4}.admin-item-card .admin-have{align-self:end;color:#91a087;margin:6px 0 4px}.admin-item-card button{border:1px solid #718455;background:#26321f;color:#dff0b9;padding:6px;font:700 8px var(--cond);letter-spacing:.06em}.admin-item-card button:hover{background:#344329}.admin-item-card button:disabled{opacity:.45;cursor:wait}
+.admin-warning{padding:8px 18px;border-top:1px solid #3b3227;background:#17120c;color:#a89579;font-size:7px}.admin-warning b{color:#d6a765}.admin-warning code{color:#cbd2cc}
+@media(max-width:900px){.admin-toolbar{grid-template-columns:1fr 1fr}.admin-item-grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr))}.admin-quickbar span{display:none}}

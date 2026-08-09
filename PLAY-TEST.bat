@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-title DEADHAUL BUILD 2.6.8 TEST SERVER
-set PORT=8811
-start "" "http://localhost:%PORT%/test-launch.html?build=2.6.8"
+title DEADHAUL BUILD 2.6.9 TEST SERVER
+set PORT=8812
+start "" "http://localhost:%PORT%/test-launch.html?build=2.6.9"
 py -m http.server %PORT%

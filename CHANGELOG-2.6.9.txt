@@ -1,0 +1,11 @@
+DEADHAUL BUILD 2.6.9 — ADMIN TEST PANEL
+
+- Added F7 admin/developer item spawner.
+- Search and category filters across the entire live item catalog.
+- Quantity selector (x1/x5/x10).
+- Persistent safehouse stash injection with batch database writes.
+- Optional current-raid field injection, respecting actual rig/pocket/backpack space.
+- Quick presets for all items, weapons, gear/armor, combat restock and meds.
+- Stash-copy counts shown per item for fast test setup.
+- Added config.js adminPanelEnabled switch. Disable before public release.
+- Retains Build 2.6.8 tactical rig/magazine/container systems.

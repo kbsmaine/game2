@@ -152,6 +152,14 @@
     const row={user_id:session.user.id,item_id:itemId,item_name:item.name,value:item.value,weight:item.weight,rarity:item.rarity};
     const {data,error}=await client.from('inventory').insert(row).select('*').single();if(error)throw error;return data;
   }
+  async function addInventoryItems(itemIds){
+    const session=await getSession();if(!session)throw new Error('No authenticated survivor session.');
+    const valid=(Array.isArray(itemIds)?itemIds:[]).filter(id=>catalog[id]);if(!valid.length)return[];
+    if(session.demo){const d=loadDemo(),records=valid.map(inventoryRecordFor);d.inventory=[...records,...(d.inventory||[])];saveDemo(d);return records}
+    const rows=valid.map(itemId=>{const item=catalog[itemId];return {user_id:session.user.id,item_id:itemId,item_name:item.name,value:item.value,weight:item.weight,rarity:item.rarity}});
+    const {data,error}=await client.from('inventory').insert(rows).select('*');if(error)throw error;return data||[];
+  }
+
   async function removeInventoryRecord(recordId){
     const session=await getSession();if(!session)throw new Error('No authenticated survivor session.');
     if(session.demo){const d=loadDemo(),idx=(d.inventory||[]).findIndex(x=>String(x.id)===String(recordId));if(idx<0)throw new Error('Stash item not found.');const [removed]=d.inventory.splice(idx,1);saveDemo(d);return removed}
@@ -172,5 +180,5 @@
     const {data,error}=await client.functions.invoke(cfg.edgeFunctionName||'complete-raid',{body:payload});if(error)throw error;return data;
   }
 
-  window.DeadhaulAuth={configured,client,catalog,defaultLoadout,getSession,enterDemo,signIn,signUp,signOut,getPlayerData,completeRaid,getLoadout,saveLoadout,addInventoryItem,removeInventoryRecord};
+  window.DeadhaulAuth={configured,client,catalog,defaultLoadout,getSession,enterDemo,signIn,signUp,signOut,getPlayerData,completeRaid,getLoadout,saveLoadout,addInventoryItem,addInventoryItems,removeInventoryRecord};
 })();

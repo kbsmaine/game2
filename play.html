@@ -7,15 +7,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/game.css?v=2.6.8" />
+  <link rel="stylesheet" href="css/game.css?v=2.6.9" />
 </head>
 <body>
   <canvas id="renderCanvas" tabindex="0"></canvas>
   <div id="gameUi">
     <div class="top-hud">
-      <div class="brandHud"><b>DEADHAUL <small>BUILD 2.6.8</small></b><span id="locationLabel">BUNKER // NODE 17</span></div>
+      <div class="brandHud"><b>DEADHAUL <small>BUILD 2.6.9</small></b><span id="locationLabel">BUNKER // NODE 17</span></div>
       <div class="raid-center"><div id="raidTimer" class="raid-timer hidden">00:00</div><div id="compass">N</div></div>
-      <div class="hud-actions"><button id="inventoryButton" type="button">TAB // INVENTORY</button><button id="alignButton" type="button">ALIGN [F6]</button><button id="settingsButton" type="button">SETTINGS</button><a href="command.html">COMMAND</a></div>
+      <div class="hud-actions"><button id="inventoryButton" type="button">TAB // INVENTORY</button><button id="alignButton" type="button">ALIGN [F6]</button><button id="adminButton" type="button">ADMIN [F7]</button><button id="settingsButton" type="button">SETTINGS</button><a href="command.html">COMMAND</a></div>
     </div>
 
     <div id="crosshair" class="crosshair"><i></i><i></i><i></i><i></i></div>
@@ -44,7 +44,7 @@
       <div class="start-card">
         <span>// GAME CLIENT</span>
         <h1>NODE 17</h1>
-        <p><b>BUILD 2.6.8 — TACTICAL CONTAINER INVENTORY</b><br>WASD move · SHIFT sprint · SPACE jump · Mouse aim · LMB fire · RMB aim · R reload · E interact · TAB inventory · G grenade · T flashlight · ESC settings</p>
+        <p><b>BUILD 2.6.9 — ADMIN TEST PANEL + TACTICAL INVENTORY</b><br>WASD move · SHIFT sprint · SPACE jump · Mouse aim · LMB fire · RMB aim · R reload · E interact · TAB inventory · F7 admin · G grenade · T flashlight · ESC settings</p>
         <button id="enterGame">ENTER BUNKER</button>
       </div>
     </div>
@@ -168,6 +168,29 @@
       </div>
     </div>
 
+    <div id="adminPanel" class="fullscreen-panel hidden">
+      <div class="panel-shell admin-shell">
+        <div class="panel-head"><div><span>// DEVELOPER TEST TOOLS</span><h2>ADMIN ITEM SPAWNER</h2></div><button class="panel-close" data-close="adminPanel">CLOSE [F7]</button></div>
+        <div class="admin-toolbar">
+          <div class="admin-search"><label>SEARCH ITEM</label><input id="adminSearch" type="search" placeholder="AK-74, plate, medkit, ammo..." autocomplete="off"></div>
+          <div><label>CATEGORY</label><select id="adminCategory"><option value="all">ALL ITEMS</option></select></div>
+          <div><label>QUANTITY</label><select id="adminQuantity"><option value="1">×1</option><option value="5">×5</option><option value="10">×10</option></select></div>
+          <div><label>DESTINATION</label><select id="adminDestination"><option value="stash">SAFEHOUSE STASH</option><option value="field">CURRENT RAID STORAGE</option></select></div>
+        </div>
+        <div class="admin-quickbar">
+          <button type="button" data-admin-preset="all">GIVE 1 OF EVERYTHING</button>
+          <button type="button" data-admin-preset="weapons">ALL WEAPONS</button>
+          <button type="button" data-admin-preset="gear">ALL GEAR / ARMOR</button>
+          <button type="button" data-admin-preset="combat">COMBAT RESTOCK</button>
+          <button type="button" data-admin-preset="medical">MEDS ×5</button>
+          <span id="adminStatus">TEST MODE // ITEMS ARE ADDED TO YOUR OWN ACCOUNT ONLY</span>
+        </div>
+        <div class="admin-grid-head"><span>ITEM CATALOG</span><b id="adminItemCount">0 ITEMS</b></div>
+        <div id="adminItemGrid" class="admin-item-grid"></div>
+        <div class="admin-warning"><b>TEST BUILD:</b> this panel intentionally bypasses normal loot acquisition. Set <code>adminPanelEnabled: false</code> in <code>config.js</code> before a public release.</div>
+      </div>
+    </div>
+
     <div id="settingsPanel" class="fullscreen-panel hidden">
       <div class="panel-shell settings-shell">
         <div class="panel-head"><div><span>// FIELD SETTINGS</span><h2>CONTROLS</h2></div><button class="panel-close" data-close="settingsPanel">CLOSE ×</button></div>
@@ -222,7 +245,7 @@
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <script src="https://cdn.babylonjs.com/havok/HavokPhysics_umd.js"></script>
   <script src="config.js"></script>
-  <script src="js/auth.js?v=2.6.8"></script>
-  <script src="js/game.js?v=2.6.8"></script>
+  <script src="js/auth.js?v=2.6.9"></script>
+  <script src="js/game.js?v=2.6.9"></script>
 </body>
 </html>
