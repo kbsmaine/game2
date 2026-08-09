@@ -1,9 +1,0 @@
-DEADHAUL BUILD 2.5.3
-- Added live F6 weapon alignment editor
-- Live gun position/rotation/scale controls
-- Per-weapon wrist correction controls
-- Find/center gun recovery button
-- Reset to models.json values
-- Optional browser-persisted alignment overrides
-- Copy Config exports ready-to-paste JSON
-- Mixamo remains authoritative for Ch15 arm poses; no IK reintroduced
