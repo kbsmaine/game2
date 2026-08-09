@@ -1,0 +1,14 @@
+DEADHAUL BUILD 2.6.2
+
+- Rebuilt enemy death tuning for stable, grounded ragdolls.
+- Removed direct 3.4 m/s corpse launch velocity and random high angular velocity.
+- Bullet impacts now apply only a subtle chest impulse; gravity creates the fall.
+- Reduced ragdoll collision proxy sizes to avoid activation overlap.
+- Disabled self-collision between body parts while preserving collision with the level.
+- Set ragdoll restitution to zero and increased body friction.
+- Added aggressive angular damping and sensible linear damping.
+- Added a 0.75 second stabilization phase that caps solver spikes after animation-to-physics handoff.
+- Added ongoing velocity caps during corpse settling to prevent endless flailing.
+- Calmed the non-Havok fallback death behavior as well.
+- Preserved Build 2.6.1 split safehouse UI, persistent stash/display, bunker customization, inventory actions and all combat/animation systems.
+- Fresh local test port: 8806.

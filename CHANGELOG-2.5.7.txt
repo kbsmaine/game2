@@ -1,0 +1,8 @@
+DEADHAUL Build 2.5.7 — Render Freeze Fix
+
+- Fixed Babylon.js 9.20.0 crash: BABYLON.Matrix.FromQuaternion is not a valid API.
+- Hand-follow quaternion conversion now uses Quaternion.toRotationMatrix(Matrix.Identity()).
+- Added finite-value validation for hand-follow quaternion, weapon position, and Euler rotation.
+- Hand-follow errors now fall back to the user's F6 neutral mount for that frame instead of stopping rendering.
+- Existing F6/browser alignment namespace and weapon offsets are preserved.
+- Local test port: 8801.
