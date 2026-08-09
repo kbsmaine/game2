@@ -1,0 +1,9 @@
+DEADHAUL BUILD 2.6.13 — WEAPON VIEW REGRESSION FIX
+
+- Restored loadViewWeapon() accidentally removed during the 2.6.12 persistent-magazine merge.
+- Restored updateWeaponView() used by the per-frame controller.
+- Preserves the 2.6.12 persistent magazines, mixed shotgun ammunition, mag manager, and inserted-mag state.
+- Keeps Ch15 Mixamo authored weapon pose, F6 alignment, hand-follow, recoil, ADS FOV and weapon-part animation.
+- Fresh browser cache version 2.6.13.
+- Local test port: 8816.
+- Existing Supabase users still only need sql/MIGRATION-2.6.12.sql; there is no new DB migration.

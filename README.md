@@ -1,36 +1,3 @@
-# DEADHAUL Build 2.6.12 — Persistent Magazines + Loose Ammunition
-
-Build 2.6.12 upgrades the weapon feed system to per-instance magazines and ammunition. Magazines are no longer abstract full-mag tokens: each magazine has its own capacity, current contents, unique ID, and loaded ammunition order.
-
-## New in 2.6.12
-
-- Detachable magazines must contain real loose rounds before they can feed a weapon.
-- Inventory shows the magazine currently inserted in the active weapon.
-- **EJECT MAG** removes it to your rig/pockets/backpack.
-- **EJECT + MANAGE** removes it and opens the magazine workbench immediately.
-- Magazine workbench supports Load 1, Load 5, Fill, Unload 1, Unload 5, and Unload All.
-- Reload (`R`) selects a compatible **loaded** spare magazine and preserves the old magazine's remaining rounds.
-- Standard, extended, and drum magazines can have different capacities and cell footprints.
-- 12 gauge now supports 00 buckshot, rifled slugs, and flechettes. Saiga magazines can mix shell types.
-- Pump shotgun loads loose shells one at a time; shell sequence is retained.
-- Dropped magazines/ammo preserve their remaining contents when picked back up.
-- Ammo and loaded-mag weight/value are calculated from their actual contents.
-- F7 admin panel automatically exposes all new magazines and ammunition.
-
-## Included magazine families
-
-PM 8 · Glock 17/33 · 1911 8/15 · MP5 30/50 drum · AK-74 30/45/75 drum · STANAG 30/40/60 drum · Saiga-12 8/12/20 drum · Vector 25/40/50 drum.
-
-## Supabase migration
-
-If you use the real Supabase backend, run `sql/MIGRATION-2.6.12.sql` once. It adds `inventory.item_data` so partially loaded magazines and loose-ammo stack counts persist in the stash and through extraction. Offline Demo mode needs no database migration.
-
-## Test
-
-Run `START-DEMO.bat` or `PLAY-TEST.bat`. Local port: **8815**. The HUD should show **BUILD 2.6.12**.
-
----
-
 # DEADHAUL Build 2.6.10 — Tarkov-Style Tactical Inventory
 
 Field inventory and safehouse loadout preparation now use separate tactical-rig, pocket, and backpack cells. Compatible magazines stored in those containers are the reload supply for detachable-magazine weapons.
