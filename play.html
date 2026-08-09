@@ -7,13 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/game.css?v=2.6.10" />
+  <link rel="stylesheet" href="css/game.css?v=2.6.11" />
 </head>
 <body>
   <canvas id="renderCanvas" tabindex="0"></canvas>
   <div id="gameUi">
     <div class="top-hud">
-      <div class="brandHud"><b>DEADHAUL <small>BUILD 2.6.10</small></b><span id="locationLabel">BUNKER // NODE 17</span></div>
+      <div class="brandHud"><b>DEADHAUL <small>BUILD 2.6.11</small></b><span id="locationLabel">BUNKER // NODE 17</span></div>
       <div class="raid-center"><div id="raidTimer" class="raid-timer hidden">00:00</div><div id="compass">N</div></div>
       <div class="hud-actions"><button id="inventoryButton" type="button">TAB // INVENTORY</button><button id="alignButton" type="button">ALIGN [F6]</button><button id="adminButton" type="button">ADMIN [F7]</button><button id="settingsButton" type="button">SETTINGS</button><a href="command.html">COMMAND</a></div>
     </div>
@@ -44,7 +44,7 @@
       <div class="start-card">
         <span>// GAME CLIENT</span>
         <h1>NODE 17</h1>
-        <p><b>BUILD 2.6.10 — ADMIN TEST PANEL + TACTICAL INVENTORY</b><br>WASD move · SHIFT sprint · SPACE jump · Mouse aim · LMB fire · RMB aim · R reload · E interact · TAB inventory · F7 admin · G grenade · T flashlight · ESC settings</p>
+        <p><b>BUILD 2.6.11 — ADMIN TEST PANEL + TACTICAL INVENTORY</b><br>WASD move · SHIFT sprint · SPACE jump · Mouse aim · LMB fire · RMB aim · R reload · E interact · TAB inventory · F7 admin · G grenade · T flashlight · ESC settings</p>
         <button id="enterGame">ENTER BUNKER</button>
       </div>
     </div>
@@ -63,7 +63,7 @@
 
     <div id="inventoryPanel" class="fullscreen-panel hidden">
       <div class="panel-shell inventory-shell">
-        <div class="panel-head"><div><span>// SURVIVOR LOADOUT</span><h2>FIELD INVENTORY</h2></div><button class="panel-close" data-close="inventoryPanel">CLOSE [TAB]</button></div>
+        <div class="panel-head"><div><span id="inventoryModeLabel">// SURVIVOR LOADOUT</span><h2 id="inventoryTitle">FIELD INVENTORY</h2></div><button class="panel-close" data-close="inventoryPanel">CLOSE [TAB]</button></div>
         <div class="inventory-layout inventory-layout-preview tarkov-inventory-layout">
           <section class="equipment-panel tarkov-equipment-panel">
             <div class="t-section-label"><span>ON BODY</span><b>EQUIPMENT</b></div>
@@ -84,7 +84,7 @@
             <div class="preview-title"><span>// PMC</span><b>SURVIVOR</b></div>
             <canvas id="characterPreviewCanvas" aria-label="3D survivor equipment preview"></canvas>
             <small>Drag to rotate · Scroll to zoom. Your worn armor and equipment update live.</small>
-            <div class="tarkov-tip"><b>QUICK TRANSFER</b><span>Drag items between containers. Double-click a backpack item to send it to the rig/pockets; double-click rig/pocket items to return them to the backpack.</span></div>
+            <div class="tarkov-tip"><b>QUICK TRANSFER</b><span id="inventoryTipText">Drag items between containers. Double-click a backpack item to send it to the rig/pockets; double-click rig/pocket items to return them to the backpack.</span></div>
           </section>
           <section class="tactical-containers-panel">
             <div class="t-container-block rig-block">
@@ -106,7 +106,7 @@
 
     <div id="stashPanel" class="fullscreen-panel hidden">
       <div class="panel-shell stash-shell">
-        <div class="panel-head"><div><span>// NODE 17 QUARTERMASTER</span><h2>STASH & DISPLAY</h2></div><button class="panel-close" data-close="stashPanel">CLOSE [TAB]</button></div>
+        <div class="panel-head"><div><span>// NODE 17 QUARTERMASTER</span><h2>STASH / LOADOUT / DISPLAY</h2></div><button class="panel-close" data-close="stashPanel">CLOSE [TAB]</button></div>
         <div class="stash-layout">
           <section class="stash-loadout-panel">
             <div class="stash-section-title"><span>READY RACK</span><b>EQUIPPED GEAR</b></div>
@@ -119,6 +119,23 @@
           </section>
           <section class="stash-storage-panel">
             <div class="bag-head"><div><span>RECOVERED INVENTORY</span><b id="stashCount">0 ITEMS</b></div><small>Everything you successfully extract with remains available here.</small></div>
+            <div class="stash-filter-bar">
+              <input id="stashSearch" class="stash-search" type="search" placeholder="SEARCH STASH..." autocomplete="off" />
+              <div class="stash-category-tabs" aria-label="Stash categories">
+                <button type="button" class="active" data-stash-category="all">ALL</button>
+                <button type="button" data-stash-category="weapons">WEAPONS</button>
+                <button type="button" data-stash-category="magazines">MAGS</button>
+                <button type="button" data-stash-category="ammo">AMMO</button>
+                <button type="button" data-stash-category="armor">ARMOR</button>
+                <button type="button" data-stash-category="rigs">RIGS</button>
+                <button type="button" data-stash-category="backpacks">PACKS</button>
+                <button type="button" data-stash-category="medical">MEDS</button>
+                <button type="button" data-stash-category="supplies">SUPPLIES</button>
+                <button type="button" data-stash-category="valuables">VALUABLES</button>
+                <button type="button" data-stash-category="gear">GEAR</button>
+                <button type="button" data-stash-category="misc">MISC</button>
+              </div>
+            </div>
             <div id="stashGridGame" class="bag-grid stash-grid-game"></div>
           </section>
           <section class="stash-display-panel">
@@ -245,7 +262,7 @@
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <script src="https://cdn.babylonjs.com/havok/HavokPhysics_umd.js"></script>
   <script src="config.js"></script>
-  <script src="js/auth.js?v=2.6.10"></script>
-  <script src="js/game.js?v=2.6.10"></script>
+  <script src="js/auth.js?v=2.6.11"></script>
+  <script src="js/game.js?v=2.6.11"></script>
 </body>
 </html>

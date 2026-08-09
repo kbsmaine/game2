@@ -1,0 +1,9 @@
+DEADHAUL BUILD 2.6.11 — BUNKER INVENTORY + CATEGORIZED STASH
+
+- TAB now opens the same Tarkov-style player inventory in both the bunker and raids.
+- In the bunker, the inventory reads/writes the persistent prepared loadout containers (rig, pockets, backpack).
+- Bunker inventory items can be dragged between containers, equipped, unequipped, or returned to stash.
+- The physical Quartermaster stash interaction remains a combined stash/loadout/display station, so players can manage everything without using TAB.
+- Quartermaster recovered inventory now has search plus categories: All, Weapons, Mags, Ammo, Armor, Rigs, Packs, Meds, Supplies, Valuables, Gear, Misc.
+- Category/search counts show filtered items vs total stash size.
+- Port bumped to 8814.

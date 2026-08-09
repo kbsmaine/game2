@@ -1,4 +1,4 @@
-# DEADHAUL Build 2.6.10 — Tarkov-Style Tactical Inventory
+# DEADHAUL Build 2.6.11 — Tarkov-Style Tactical Inventory
 
 Field inventory and safehouse loadout preparation now use separate tactical-rig, pocket, and backpack cells. Compatible magazines stored in those containers are the reload supply for detachable-magazine weapons.
 
@@ -38,16 +38,16 @@ Confirm the HUD says **BUILD 2.6.6**.
 Enemy deaths now use the supplied Mixamo clips (`death_forward`, `death_generic`, `death_front_hit`) on Ch18, Ch35, and SWAT. The authored animation drives the fall; only restrained damped secondary bone motion is layered near impact and after landing.
 
 
-## Build 2.6.10 — Armor and Storage
+## Build 2.6.11 — Armor and Storage
 
 This build adds front/back armor plate slots, functional helmets, plate carriers, non-armored chest rigs, and multiple backpack/storage capacities. Chest rigs increase carrying capacity only; plate carriers accept front/back plates; helmets and plates now reduce real incoming damage based on hit location.
 
 
-## Build 2.6.10
+## Build 2.6.11
 TAB inventory now uses tactical container cells. Magazines/ammo/meds/grenades can be kept in chest rigs, pockets or backpacks. Drag items between containers; compatible spare magazines are consumed when reloading.
 
 
-## Build 2.6.10 — Admin Test Panel
+## Build 2.6.11 — Admin Test Panel
 - Press **F7** or click **ADMIN [F7]** to open the developer item spawner.
 - Search/filter the live item catalog and add x1/x5/x10 copies to your persistent safehouse stash.
 - Quick actions: one of everything, all weapons, all gear/armor, combat restock, and medical restock.
