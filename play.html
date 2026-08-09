@@ -7,13 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/game.css?v=2.6.11" />
+  <link rel="stylesheet" href="css/game.css?v=2.6.12" />
 </head>
 <body>
   <canvas id="renderCanvas" tabindex="0"></canvas>
   <div id="gameUi">
     <div class="top-hud">
-      <div class="brandHud"><b>DEADHAUL <small>BUILD 2.6.11</small></b><span id="locationLabel">BUNKER // NODE 17</span></div>
+      <div class="brandHud"><b>DEADHAUL <small>BUILD 2.6.12</small></b><span id="locationLabel">BUNKER // NODE 17</span></div>
       <div class="raid-center"><div id="raidTimer" class="raid-timer hidden">00:00</div><div id="compass">N</div></div>
       <div class="hud-actions"><button id="inventoryButton" type="button">TAB // INVENTORY</button><button id="alignButton" type="button">ALIGN [F6]</button><button id="adminButton" type="button">ADMIN [F7]</button><button id="settingsButton" type="button">SETTINGS</button><a href="command.html">COMMAND</a></div>
     </div>
@@ -44,7 +44,7 @@
       <div class="start-card">
         <span>// GAME CLIENT</span>
         <h1>NODE 17</h1>
-        <p><b>BUILD 2.6.11 — ADMIN TEST PANEL + TACTICAL INVENTORY</b><br>WASD move · SHIFT sprint · SPACE jump · Mouse aim · LMB fire · RMB aim · R reload · E interact · TAB inventory · F7 admin · G grenade · T flashlight · ESC settings</p>
+        <p><b>BUILD 2.6.12 — PERSISTENT MAGAZINES + LOOSE AMMO</b><br>WASD move · SHIFT sprint · SPACE jump · Mouse aim · LMB fire · RMB aim · R reload · E interact · TAB inventory · F7 admin · G grenade · T flashlight · ESC settings</p>
         <button id="enterGame">ENTER BUNKER</button>
       </div>
     </div>
@@ -79,12 +79,13 @@
               <div class="equip-slot wide" data-slot="backpack"><span>BACKPACK</span><b id="equip-backpack">—</b></div>
             </div>
             <div class="weapon-detail"><span>ACTIVE WEAPON</span><b id="invWeaponName">—</b><small id="invWeaponStats">—</small></div>
+            <div id="activeFeedControls" class="active-feed-controls"></div>
           </section>
           <section class="character-preview-panel tarkov-character-panel">
             <div class="preview-title"><span>// PMC</span><b>SURVIVOR</b></div>
             <canvas id="characterPreviewCanvas" aria-label="3D survivor equipment preview"></canvas>
             <small>Drag to rotate · Scroll to zoom. Your worn armor and equipment update live.</small>
-            <div class="tarkov-tip"><b>QUICK TRANSFER</b><span id="inventoryTipText">Drag items between containers. Double-click a backpack item to send it to the rig/pockets; double-click rig/pocket items to return them to the backpack.</span></div>
+            <div class="tarkov-tip"><b>MAGAZINES & AMMO</b><span id="inventoryTipText">Magazines store real rounds. Use MANAGE to load, unload and insert them.</span></div>
           </section>
           <section class="tactical-containers-panel">
             <div class="t-container-block rig-block">
@@ -104,9 +105,37 @@
       </div>
     </div>
 
+
+
+    <div id="magazinePanel" class="fullscreen-panel hidden">
+      <div class="panel-shell magazine-shell">
+        <div class="panel-head"><div><span>// AMMUNITION WORKBENCH</span><h2>MAGAZINE MANAGEMENT</h2></div><button id="magManagerClose" class="panel-close">CLOSE</button></div>
+        <div class="magazine-layout">
+          <section class="magazine-focus">
+            <div class="magazine-title"><span>SELECTED MAGAZINE</span><h3 id="magManageName">—</h3><small id="magManageMeta">—</small></div>
+            <div class="mag-round-meter"><i id="magManageBar"></i></div>
+            <div class="mag-contents"><span>LOADED STACK</span><b id="magManageContents">EMPTY</b><small>The last round loaded is the next round fired. This allows mixed ammunition and mixed shotgun shells.</small></div>
+            <div class="mag-unload-actions">
+              <button id="magUnloadOne">UNLOAD 1</button>
+              <button id="magUnloadFive">UNLOAD 5</button>
+              <button id="magUnloadAll">UNLOAD ALL</button>
+            </div>
+          </section>
+          <section class="magazine-ammo-panel">
+            <div class="mag-section-head"><span>LOOSE AMMUNITION</span><b>LOAD MAGAZINE</b><small>Rounds are taken from your rig, pockets and backpack.</small></div>
+            <div id="magAmmoSources" class="mag-ammo-sources"></div>
+          </section>
+          <section class="magazine-insert-panel">
+            <div class="mag-section-head"><span>WEAPON FEED</span><b>INSERT MAGAZINE</b><small>The currently inserted magazine is ejected back into your containers.</small></div>
+            <div id="magInsertActions" class="mag-insert-actions"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
     <div id="stashPanel" class="fullscreen-panel hidden">
       <div class="panel-shell stash-shell">
-        <div class="panel-head"><div><span>// NODE 17 QUARTERMASTER</span><h2>STASH / LOADOUT / DISPLAY</h2></div><button class="panel-close" data-close="stashPanel">CLOSE [TAB]</button></div>
+        <div class="panel-head"><div><span>// NODE 17 QUARTERMASTER</span><h2>STASH & DISPLAY</h2></div><button class="panel-close" data-close="stashPanel">CLOSE [TAB]</button></div>
         <div class="stash-layout">
           <section class="stash-loadout-panel">
             <div class="stash-section-title"><span>READY RACK</span><b>EQUIPPED GEAR</b></div>
@@ -115,25 +144,14 @@
             <div class="prep-container"><div class="prep-container-head"><span>CHEST RIG</span><b id="preparedRigMeta">0/0 CELLS</b></div><div id="preparedRigGrid" class="t-container-grid prep-grid"></div></div>
             <div class="prep-container"><div class="prep-container-head"><span>POCKETS</span><b id="preparedPocketMeta">0/4 CELLS</b></div><div id="preparedPocketGrid" class="t-container-grid prep-grid"></div></div>
             <div class="prep-container"><div class="prep-container-head"><span>BACKPACK</span><b id="preparedBagMeta">0/0 CELLS</b></div><div id="preparedGrid" class="t-container-grid prep-grid"></div></div>
-            <small class="stash-note">Tactical items auto-pack into your rig first, then pockets, then backpack. Magazines in these containers become your reload supply in raid.</small>
+            <small class="stash-note">Tactical items auto-pack into your rig first, then pockets, then backpack. Magazines must be loaded with loose ammunition. Press MANAGE on a prepared magazine to load/unload it before deployment.</small>
           </section>
           <section class="stash-storage-panel">
             <div class="bag-head"><div><span>RECOVERED INVENTORY</span><b id="stashCount">0 ITEMS</b></div><small>Everything you successfully extract with remains available here.</small></div>
             <div class="stash-filter-bar">
-              <input id="stashSearch" class="stash-search" type="search" placeholder="SEARCH STASH..." autocomplete="off" />
-              <div class="stash-category-tabs" aria-label="Stash categories">
-                <button type="button" class="active" data-stash-category="all">ALL</button>
-                <button type="button" data-stash-category="weapons">WEAPONS</button>
-                <button type="button" data-stash-category="magazines">MAGS</button>
-                <button type="button" data-stash-category="ammo">AMMO</button>
-                <button type="button" data-stash-category="armor">ARMOR</button>
-                <button type="button" data-stash-category="rigs">RIGS</button>
-                <button type="button" data-stash-category="backpacks">PACKS</button>
-                <button type="button" data-stash-category="medical">MEDS</button>
-                <button type="button" data-stash-category="supplies">SUPPLIES</button>
-                <button type="button" data-stash-category="valuables">VALUABLES</button>
-                <button type="button" data-stash-category="gear">GEAR</button>
-                <button type="button" data-stash-category="misc">MISC</button>
+              <input id="stashSearch" class="stash-search" type="search" placeholder="SEARCH STASH // AK-74, MAGAZINE, MEDKIT..." autocomplete="off">
+              <div class="stash-category-tabs">
+                <button class="active" data-stash-category="all">ALL</button><button data-stash-category="weapons">WEAPONS</button><button data-stash-category="magazines">MAGS</button><button data-stash-category="ammo">AMMO</button><button data-stash-category="armor">ARMOR</button><button data-stash-category="rigs">RIGS</button><button data-stash-category="backpacks">PACKS</button><button data-stash-category="medical">MEDS</button><button data-stash-category="supplies">SUPPLIES</button><button data-stash-category="valuables">VALUABLES</button><button data-stash-category="gear">GEAR</button><button data-stash-category="misc">MISC</button>
               </div>
             </div>
             <div id="stashGridGame" class="bag-grid stash-grid-game"></div>
@@ -262,7 +280,7 @@
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <script src="https://cdn.babylonjs.com/havok/HavokPhysics_umd.js"></script>
   <script src="config.js"></script>
-  <script src="js/auth.js?v=2.6.11"></script>
-  <script src="js/game.js?v=2.6.11"></script>
+  <script src="js/auth.js?v=2.6.12"></script>
+  <script src="js/game.js?v=2.6.12"></script>
 </body>
 </html>

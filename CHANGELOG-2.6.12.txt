@@ -1,0 +1,15 @@
+DEADHAUL BUILD 2.6.12 — PERSISTENT MAGAZINES + LOOSE AMMUNITION
+
+- Magazines are unique persistent containers with real round contents.
+- Standard, extended and drum variants added across detachable-mag weapons.
+- Magazine manager UI: load/unload loose rounds and insert compatible magazines.
+- Active weapon inventory panel shows/ejects/manages inserted magazine.
+- R reload uses a real loaded spare mag and preserves partial magazines.
+- Loose ammo stacks persist their remaining round count.
+- 12 gauge: 00 buckshot, rifled slug, flechette; mixed Saiga mags supported.
+- Pump shotgun loads loose shells individually and retains shell order.
+- Multi-cell extended/drum mags consume additional rig/backpack space.
+- Dropped magazines retain their contents.
+- Extraction/stash persistence includes item_data metadata.
+- Added Supabase migration sql/MIGRATION-2.6.12.sql.
+- New local test port: 8815.

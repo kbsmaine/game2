@@ -3,7 +3,8 @@
   const configured=!!(cfg.supabaseUrl&&cfg.supabaseAnonKey&&!cfg.supabaseUrl.includes('YOUR_')&&!cfg.supabaseAnonKey.includes('YOUR_'));
   const client=configured&&window.supabase?window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey):null;
   const DEMO_SESSION_KEY='deadhaul_demo_session';
-  const DEMO_DATA_KEY='deadhaul_demo_data_v2';
+  const DEMO_DATA_KEY='deadhaul_demo_data_v3';
+  const PREVIOUS_DEMO_DATA_KEY='deadhaul_demo_data_v2';
   const OLD_DEMO_DATA_KEY='deadhaul_demo_data_v1';
 
   const catalog={
@@ -40,24 +41,37 @@
     cash_bundle:{name:'Emergency Cash Bundle',weight:.20,value:1250,rarity:'rare',category:'valuable'},
     gold_chain:{name:'Gold Chain',weight:.09,value:2200,rarity:'epic',category:'valuable'},
     // Ammunition
-    ammo_9x18:{name:'9x18mm FMJ x30',weight:.32,value:190,rarity:'common',category:'ammo'},
-    ammo_9x19:{name:'9x19mm FMJ x30',weight:.36,value:230,rarity:'common',category:'ammo'},
-    ammo_45:{name:'.45 ACP x24',weight:.42,value:260,rarity:'common',category:'ammo'},
-    ammo_545:{name:'5.45x39mm PS x30',weight:.39,value:310,rarity:'common',category:'ammo'},
-    ammo_556:{name:'5.56x45mm M855 x30',weight:.38,value:380,rarity:'rare',category:'ammo'},
-    ammo_762x39:{name:'7.62x39mm PS x30',weight:.52,value:350,rarity:'common',category:'ammo'},
-    ammo_762x54:{name:'7.62x54R LPS x20',weight:.48,value:420,rarity:'rare',category:'ammo'},
-    ammo_12g:{name:'12 Gauge Buckshot x12',weight:.58,value:290,rarity:'common',category:'ammo'},
-    ammo_308:{name:'.308 Match x20',weight:.47,value:520,rarity:'rare',category:'ammo'},
-    // Detachable magazines — Build 2.6.8
-    mag_pm_8:{name:'PM 8-rd Magazine',weight:.16,value:145,rarity:'common',category:'magazine',weapon:'makarov',rounds:8,ammo:'ammo_9x18'},
-    mag_g17_17:{name:'G17 17-rd Magazine',weight:.27,value:260,rarity:'common',category:'magazine',weapon:'glock17',rounds:17,ammo:'ammo_9x19'},
-    mag_1911_8:{name:'1911 8-rd Magazine',weight:.22,value:220,rarity:'common',category:'magazine',weapon:'pistol1911',rounds:8,ammo:'ammo_45'},
-    mag_mp5_30:{name:'MP5 30-rd Magazine',weight:.48,value:420,rarity:'common',category:'magazine',weapon:'mp5',rounds:30,ammo:'ammo_9x19'},
-    mag_ak74_30:{name:'AK-74 30-rd Magazine',weight:.52,value:510,rarity:'common',category:'magazine',weapon:'ak74',rounds:30,ammo:'ammo_545'},
-    mag_m4_30:{name:'STANAG 30-rd Magazine',weight:.47,value:590,rarity:'rare',category:'magazine',weapon:'m4a1',rounds:30,ammo:'ammo_556'},
-    mag_saiga_8:{name:'Saiga-12 8-rd Magazine',weight:.72,value:680,rarity:'rare',category:'magazine',weapon:'saiga12',rounds:8,ammo:'ammo_12g'},
-    mag_vector_25:{name:'Vector 25-rd Magazine',weight:.41,value:520,rarity:'rare',category:'magazine',weapon:'vector',rounds:25,ammo:'ammo_9x19'},
+    ammo_9x18:{name:'9x18mm FMJ',weight:.0107,value:7,rarity:'common',category:'ammo',caliber:'9x18',stackRounds:60},
+    ammo_9x19:{name:'9x19mm FMJ',weight:.012,value:8,rarity:'common',category:'ammo',caliber:'9x19',stackRounds:60},
+    ammo_45:{name:'.45 ACP FMJ',weight:.0175,value:11,rarity:'common',category:'ammo',caliber:'45acp',stackRounds:50},
+    ammo_545:{name:'5.45x39mm PS',weight:.013,value:11,rarity:'common',category:'ammo',caliber:'545',stackRounds:60},
+    ammo_556:{name:'5.56x45mm M855',weight:.0127,value:13,rarity:'rare',category:'ammo',caliber:'556',stackRounds:60},
+    ammo_762x39:{name:'7.62x39mm PS',weight:.0173,value:12,rarity:'common',category:'ammo',caliber:'762x39',stackRounds:60},
+    ammo_762x54:{name:'7.62x54R LPS',weight:.024,value:21,rarity:'rare',category:'ammo',caliber:'762x54',stackRounds:40},
+    ammo_308:{name:'.308 Match',weight:.0235,value:26,rarity:'rare',category:'ammo',caliber:'308',stackRounds:40},
+    ammo_12g:{name:'12 Gauge 00 Buckshot',weight:.048,value:24,rarity:'common',category:'ammo',caliber:'12g',stackRounds:20,shellType:'buckshot'},
+    ammo_12g_slug:{name:'12 Gauge Rifled Slug',weight:.045,value:42,rarity:'rare',category:'ammo',caliber:'12g',stackRounds:20,shellType:'slug'},
+    ammo_12g_flechette:{name:'12 Gauge Flechette',weight:.041,value:58,rarity:'rare',category:'ammo',caliber:'12g',stackRounds:20,shellType:'flechette'},
+    // Detachable magazines — Build 2.6.12. Magazines are persistent containers and spawn empty.
+    mag_pm_8:{name:'PM 8-rd Magazine',weight:.16,value:145,rarity:'common',category:'magazine',weapons:['makarov'],capacity:8,caliber:'9x18',cells:1},
+    mag_g17_17:{name:'G17 17-rd Magazine',weight:.27,value:260,rarity:'common',category:'magazine',weapons:['glock17'],capacity:17,caliber:'9x19',cells:1},
+    mag_g17_33:{name:'G17 33-rd Extended Magazine',weight:.42,value:540,rarity:'rare',category:'magazine',weapons:['glock17'],capacity:33,caliber:'9x19',cells:2},
+    mag_1911_8:{name:'1911 8-rd Magazine',weight:.22,value:220,rarity:'common',category:'magazine',weapons:['pistol1911'],capacity:8,caliber:'45acp',cells:1},
+    mag_1911_15:{name:'1911 15-rd Extended Magazine',weight:.36,value:490,rarity:'rare',category:'magazine',weapons:['pistol1911'],capacity:15,caliber:'45acp',cells:2},
+    mag_mp5_30:{name:'MP5 30-rd Magazine',weight:.48,value:420,rarity:'common',category:'magazine',weapons:['mp5'],capacity:30,caliber:'9x19',cells:1},
+    mag_mp5_50:{name:'MP5 50-rd Drum',weight:.88,value:1120,rarity:'epic',category:'magazine',weapons:['mp5'],capacity:50,caliber:'9x19',cells:2},
+    mag_ak74_30:{name:'AK-74 30-rd Magazine',weight:.52,value:510,rarity:'common',category:'magazine',weapons:['ak74'],capacity:30,caliber:'545',cells:1},
+    mag_ak74_45:{name:'AK-74 45-rd Extended Magazine',weight:.69,value:790,rarity:'rare',category:'magazine',weapons:['ak74'],capacity:45,caliber:'545',cells:2},
+    mag_ak74_75:{name:'AK-74 75-rd Drum',weight:1.28,value:1850,rarity:'epic',category:'magazine',weapons:['ak74'],capacity:75,caliber:'545',cells:2},
+    mag_m4_30:{name:'STANAG 30-rd Magazine',weight:.47,value:590,rarity:'rare',category:'magazine',weapons:['m4a1'],capacity:30,caliber:'556',cells:1},
+    mag_m4_40:{name:'STANAG 40-rd Extended Magazine',weight:.61,value:880,rarity:'rare',category:'magazine',weapons:['m4a1'],capacity:40,caliber:'556',cells:2},
+    mag_m4_60:{name:'M4 60-rd Drum',weight:1.02,value:1760,rarity:'epic',category:'magazine',weapons:['m4a1'],capacity:60,caliber:'556',cells:2},
+    mag_saiga_8:{name:'Saiga-12 8-rd Magazine',weight:.72,value:680,rarity:'rare',category:'magazine',weapons:['saiga12'],capacity:8,caliber:'12g',cells:1},
+    mag_saiga_12:{name:'Saiga-12 12-rd Extended Magazine',weight:.94,value:1180,rarity:'rare',category:'magazine',weapons:['saiga12'],capacity:12,caliber:'12g',cells:2},
+    mag_saiga_20:{name:'Saiga-12 20-rd Drum',weight:1.46,value:2350,rarity:'epic',category:'magazine',weapons:['saiga12'],capacity:20,caliber:'12g',cells:2},
+    mag_vector_25:{name:'Vector 25-rd Magazine',weight:.41,value:520,rarity:'rare',category:'magazine',weapons:['vector'],capacity:25,caliber:'9x19',cells:1},
+    mag_vector_40:{name:'Vector 40-rd Extended Magazine',weight:.59,value:930,rarity:'rare',category:'magazine',weapons:['vector'],capacity:40,caliber:'9x19',cells:2},
+    mag_vector_50:{name:'Vector 50-rd Drum',weight:.91,value:1680,rarity:'epic',category:'magazine',weapons:['vector'],capacity:50,caliber:'9x19',cells:2},
     // Weapons
     makarov:{name:'PM Makarov',weight:.73,value:980,rarity:'common',category:'weapon'},
     glock17:{name:'Glock 17',weight:.91,value:1600,rarity:'rare',category:'weapon'},
@@ -101,11 +115,17 @@
     gas_mask:{name:'Full-Face Gas Mask',weight:1.15,value:3100,rarity:'rare',category:'gear'}
   };
 
-  const defaultLoadout={head:'helmet',hands:'tactical_gloves',armor:'plate_carrier',front_plate:'armor_plate_lvl3',back_plate:'armor_plate_lvl3',rig:'chest_rig',backpack:'scav_pack',primary:'ak74',secondary:'makarov',_bag:['bandage','water_bottle'],_rigItems:['mag_ak74_30','mag_ak74_30','mag_ak74_30','frag_grenade'],_pocketItems:['mag_pm_8','bandage']};
+  const uid=()=>crypto.randomUUID?.()||('i_'+Math.random().toString(36).slice(2));
+  function makeItemData(itemId,opts={}){const item=catalog[itemId];if(!item)return null;if(item.category==='magazine')return {uid:opts.uid||uid(),contents:Array.isArray(opts.contents)?[...opts.contents]:[]};if(item.category==='ammo')return {uid:opts.uid||uid(),rounds:Math.max(0,Math.min(item.stackRounds||60,Number(opts.rounds??item.stackRounds??60)))};return opts&&Object.keys(opts).length?{...opts}:null}
+  function inputItem(ref){if(typeof ref==='string')return {id:ref,data:makeItemData(ref)};const id=ref?.id||ref?.item_id;const data=id?makeItemData(id,ref?.item_data||ref||{}):null;return {id,data}}
+  function itemMetrics(itemId,data={}){const item=catalog[itemId];if(!item)return {value:0,weight:0};if(item.category==='ammo'){const rounds=Math.max(0,Number(data?.rounds??item.stackRounds??0)||0);return {value:item.value*rounds,weight:item.weight*rounds}}if(item.category==='magazine'){const contents=Array.isArray(data?.contents)?data.contents:[];return {value:item.value+contents.reduce((n,a)=>n+Number(catalog[a]?.value||0),0),weight:item.weight+contents.reduce((n,a)=>n+Number(catalog[a]?.weight||0),0)}}return {value:item.value,weight:item.weight}}
+  const loadedMag=(id,ammo)=>({id,uid:uid(),contents:Array.from({length:catalog[id]?.capacity||0},()=>ammo)});
+  const ammoStack=(id,rounds=catalog[id]?.stackRounds||60)=>({id,uid:uid(),rounds});
+  const defaultLoadout={head:'helmet',hands:'tactical_gloves',armor:'plate_carrier',front_plate:'armor_plate_lvl3',back_plate:'armor_plate_lvl3',rig:'chest_rig',backpack:'scav_pack',primary:'ak74',secondary:'makarov',_bag:['bandage','water_bottle',ammoStack('ammo_545',60)],_rigItems:[loadedMag('mag_ak74_30','ammo_545'),loadedMag('mag_ak74_30','ammo_545'),loadedMag('mag_ak74_30','ammo_545'),'frag_grenade'],_pocketItems:[loadedMag('mag_pm_8','ammo_9x18'),'bandage'],_weaponMags:{ak74:loadedMag('mag_ak74_30','ammo_545'),makarov:loadedMag('mag_pm_8','ammo_9x18')},_internalAmmo:{}};
   function initialDemoData(callsign='ROOK-17'){
     return {profile:{callsign},state:{level:1,xp:0,raids:0,extractions:0,stash_value:0,bunker_level:1,power:18,has_generator:false},loadout:{...defaultLoadout},inventory:[],raids:[]};
   }
-  function loadDemo(){try{const fresh=JSON.parse(localStorage.getItem(DEMO_DATA_KEY));if(fresh)return fresh;const old=JSON.parse(localStorage.getItem(OLD_DEMO_DATA_KEY));if(old){old.loadout=old.loadout||{...defaultLoadout};saveDemo(old);return old}return initialDemoData()}catch{return initialDemoData()}}
+  function loadDemo(){try{const fresh=JSON.parse(localStorage.getItem(DEMO_DATA_KEY));if(fresh)return fresh;const prior=JSON.parse(localStorage.getItem(PREVIOUS_DEMO_DATA_KEY));if(prior){prior.loadout=prior.loadout||{...defaultLoadout};saveDemo(prior);return prior}const old=JSON.parse(localStorage.getItem(OLD_DEMO_DATA_KEY));if(old){old.loadout=old.loadout||{...defaultLoadout};saveDemo(old);return old}return initialDemoData()}catch{return initialDemoData()}}
   function saveDemo(data){localStorage.setItem(DEMO_DATA_KEY,JSON.stringify(data))}
   function demoSession(){try{return JSON.parse(sessionStorage.getItem(DEMO_SESSION_KEY))}catch{return null}}
 
@@ -145,19 +165,19 @@
     if(p.error)throw p.error;if(s.error)throw s.error;
     return {profile:p.data,state:s.data,inventory:i.data||[],raids:r.data||[],loadout:{...defaultLoadout,...(l.data?.loadout||{})}};
   }
-  function inventoryRecordFor(itemId){const item=catalog[itemId];if(!item)throw new Error('Unknown item: '+itemId);return {id:crypto.randomUUID?.()||String(Math.random()),item_id:itemId,item_name:item.name,value:item.value,weight:item.weight,rarity:item.rarity,acquired_at:new Date().toISOString()}}
-  async function addInventoryItem(itemId){
-    const session=await getSession();if(!session)throw new Error('No authenticated survivor session.');const item=catalog[itemId];if(!item)throw new Error('Unknown item: '+itemId);
-    if(session.demo){const d=loadDemo(),rec=inventoryRecordFor(itemId);d.inventory=[rec,...(d.inventory||[])];saveDemo(d);return rec}
-    const row={user_id:session.user.id,item_id:itemId,item_name:item.name,value:item.value,weight:item.weight,rarity:item.rarity};
-    const {data,error}=await client.from('inventory').insert(row).select('*').single();if(error)throw error;return data;
+  function inventoryRecordFor(ref){const {id:itemId,data}=inputItem(ref),item=catalog[itemId];if(!item)throw new Error('Unknown item: '+itemId);const metrics=itemMetrics(itemId,data);return {id:uid(),item_id:itemId,item_name:item.name,value:metrics.value,weight:metrics.weight,rarity:item.rarity,item_data:data||{},acquired_at:new Date().toISOString()}}
+  async function addInventoryItem(ref){
+    const session=await getSession();if(!session)throw new Error('No authenticated survivor session.');const parsed=inputItem(ref),itemId=parsed.id,item=catalog[itemId];if(!item)throw new Error('Unknown item: '+itemId);
+    if(session.demo){const d=loadDemo(),rec=inventoryRecordFor(ref);d.inventory=[rec,...(d.inventory||[])];saveDemo(d);return rec}
+    const metrics=itemMetrics(itemId,parsed.data);const row={user_id:session.user.id,item_id:itemId,item_name:item.name,value:metrics.value,weight:metrics.weight,rarity:item.rarity,item_data:parsed.data||{}};
+    let q=await client.from('inventory').insert(row).select('*').single();if(q.error&&String(q.error.message||q.error).includes('item_data')){delete row.item_data;q=await client.from('inventory').insert(row).select('*').single()}if(q.error)throw q.error;return q.data;
   }
-  async function addInventoryItems(itemIds){
+  async function addInventoryItems(itemRefs){
     const session=await getSession();if(!session)throw new Error('No authenticated survivor session.');
-    const valid=(Array.isArray(itemIds)?itemIds:[]).filter(id=>catalog[id]);if(!valid.length)return[];
-    if(session.demo){const d=loadDemo(),records=valid.map(inventoryRecordFor);d.inventory=[...records,...(d.inventory||[])];saveDemo(d);return records}
-    const rows=valid.map(itemId=>{const item=catalog[itemId];return {user_id:session.user.id,item_id:itemId,item_name:item.name,value:item.value,weight:item.weight,rarity:item.rarity}});
-    const {data,error}=await client.from('inventory').insert(rows).select('*');if(error)throw error;return data||[];
+    const valid=(Array.isArray(itemRefs)?itemRefs:[]).map(inputItem).filter(x=>catalog[x.id]);if(!valid.length)return[];
+    if(session.demo){const d=loadDemo(),records=(Array.isArray(itemRefs)?itemRefs:[]).filter(x=>catalog[inputItem(x).id]).map(inventoryRecordFor);d.inventory=[...records,...(d.inventory||[])];saveDemo(d);return records}
+    let rows=valid.map(({id:itemId,data})=>{const item=catalog[itemId];const metrics=itemMetrics(itemId,data);return {user_id:session.user.id,item_id:itemId,item_name:item.name,value:metrics.value,weight:metrics.weight,rarity:item.rarity,item_data:data||{}}});
+    let q=await client.from('inventory').insert(rows).select('*');if(q.error&&String(q.error.message||q.error).includes('item_data')){rows=rows.map(({item_data,...r})=>r);q=await client.from('inventory').insert(rows).select('*')}if(q.error)throw q.error;return q.data||[];
   }
 
   async function removeInventoryRecord(recordId){
@@ -170,11 +190,11 @@
     const session=await getSession();if(!session)throw new Error('No authenticated survivor session.');
     if(session.demo){
       const d=loadDemo();
-      const items=(payload.items||[]).filter(id=>catalog[id]).map(id=>({id:crypto.randomUUID?.()||String(Math.random()),item_id:id,item_name:catalog[id].name,value:catalog[id].value,weight:catalog[id].weight,rarity:catalog[id].rarity,acquired_at:new Date().toISOString()}));
+      const items=(payload.items||[]).map(inputItem).filter(x=>catalog[x.id]).map(({id:itemId,data})=>{const metrics=itemMetrics(itemId,data);return {id:uid(),item_id:itemId,item_name:catalog[itemId].name,value:metrics.value,weight:metrics.weight,rarity:catalog[itemId].rarity,item_data:data||{},acquired_at:new Date().toISOString()}});
       const value=items.reduce((a,b)=>a+b.value,0);
       const raid={id:crypto.randomUUID?.()||String(Math.random()),zone:payload.zone||'Unknown Zone',status:'extracted',duration_seconds:payload.duration_seconds||0,recovered_value:value,item_count:items.length,created_at:new Date().toISOString()};
       d.inventory=[...items,...d.inventory];d.raids=[raid,...d.raids];d.state.raids+=1;d.state.extractions+=1;d.state.stash_value+=value;d.state.xp+=Math.max(60,Math.round(value/18));d.state.level=1+Math.floor(d.state.xp/650);
-      if((payload.items||[]).includes('portable_generator')){d.state.has_generator=true;d.state.power=92;d.state.bunker_level=Math.max(2,d.state.bunker_level)}
+      if((payload.items||[]).some(x=>inputItem(x).id==='portable_generator')){d.state.has_generator=true;d.state.power=92;d.state.bunker_level=Math.max(2,d.state.bunker_level)}
       saveDemo(d);return {raid,value,state:d.state};
     }
     const {data,error}=await client.functions.invoke(cfg.edgeFunctionName||'complete-raid',{body:payload});if(error)throw error;return data;

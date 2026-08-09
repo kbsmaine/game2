@@ -7,10 +7,23 @@ const catalog:Record<string,Item>={
   canned_beans:I('Canned Beans',95,.48),water_bottle:I('Purified Water',120,.65),energy_bar:I('Emergency Ration Bar',75,.18),coffee:I('Instant Coffee',160,.20),
   copper_wire:I('Copper Wire Coil',110,.4),battery:I('12V Battery',620,3.8),fuel_can:I('Fuel Can',740,6.2),tool_case:I('Industrial Tool Case',1180,7.8,'rare'),power_inverter:I('Industrial Power Inverter',2450,5.4,'rare'),drill:I('Cordless Drill',560,1.9),wrench_set:I('Mechanic Wrench Set',410,2.4),spark_plugs:I('Spark Plug Set',260,.35),motor:I('Electric Motor',1680,9.6,'rare'),portable_generator:I('Portable Generator GX-220',4800,94,'heavy'),
   ssd:I('Encrypted SSD',760,.08,'rare'),gpu:I('Graphics Processor',1850,1.1,'rare'),circuit_board:I('Control Circuit Board',670,.35),military_radio:I('Encrypted Field Radio',2100,1.8,'epic'),keycard:I('Restricted Access Keycard',3200,.02,'epic'),wristwatch:I('Mechanical Wristwatch',890,.12,'rare'),cash_bundle:I('Emergency Cash Bundle',1250,.20,'rare'),gold_chain:I('Gold Chain',2200,.09,'epic'),
-  ammo_9x18:I('9x18mm FMJ x30',190,.32),ammo_9x19:I('9x19mm FMJ x30',230,.36),ammo_45:I('.45 ACP x24',260,.42),ammo_545:I('5.45x39mm PS x30',310,.39),ammo_556:I('5.56x45mm M855 x30',380,.38,'rare'),ammo_762x39:I('7.62x39mm PS x30',350,.52),ammo_762x54:I('7.62x54R LPS x20',420,.48,'rare'),ammo_12g:I('12 Gauge Buckshot x12',290,.58),ammo_308:I('.308 Match x20',520,.47,'rare'),
+  ammo_9x18:I('9x18mm FMJ',7,.0107),ammo_9x19:I('9x19mm FMJ',8,.012),ammo_45:I('.45 ACP FMJ',11,.0175),ammo_545:I('5.45x39mm PS',11,.013),ammo_556:I('5.56x45mm M855',13,.0127,'rare'),ammo_762x39:I('7.62x39mm PS',12,.0173),ammo_762x54:I('7.62x54R LPS',21,.024,'rare'),ammo_12g:I('12 Gauge 00 Buckshot',24,.048),ammo_308:I('.308 Match',26,.0235,'rare'),
   makarov:I('PM Makarov',980,.73),glock17:I('Glock 17',1600,.91,'rare'),pistol1911:I('M1911A1',1750,1.1,'rare'),mp5:I('MP5A3',4100,2.9,'rare'),ak74:I('AK-74',5200,3.3,'rare'),m4a1:I('M4A1',6900,3.1,'epic'),sks:I('SKS Carbine',3600,3.8,'rare'),mosin:I('Mosin-Nagant',3300,4,'rare'),pump12:I('12 Gauge Pump Shotgun',2900,3.2,'rare'),saiga12:I('Saiga-12',6100,3.6,'epic'),r700:I('Remington 700',7200,4.1,'epic'),vector:I('KRISS Vector',7600,2.7,'epic'),
   frag_grenade:I('M67 Fragmentation Grenade',720,.40,'rare'),tactical_gloves:I('Tactical Gloves',280,.18),work_gloves:I('Leather Work Gloves',150,.22),winter_gloves:I('Insulated Field Gloves',460,.30,'rare'),frag_grenade:I('M67 Fragmentation Grenade',720,.40,'rare'),tactical_gloves:I('Tactical Gloves',280,.18),work_gloves:I('Leather Work Gloves',150,.22),winter_gloves:I('Insulated Field Gloves',460,.30,'rare'),scav_pack:I('Scavenger Backpack',850,1.2),patrol_pack:I('Patrol Backpack',1650,1.8,'rare'),soft_armor:I('Level II Soft Armor',1900,3.1),plate_carrier:I('Level III Plate Carrier',5100,7.4,'rare'),helmet:I('Ballistic Helmet',2400,1.45,'rare'),heavy_visor_helmet:I('Heavy Visor Helmet',5200,2.35,'epic'),gas_mask:I('Full-Face Gas Mask',3100,1.15,'rare'),heavy_visor_helmet:I('Heavy Visor Helmet',5200,2.35,'epic'),gas_mask:I('Full-Face Gas Mask',3100,1.15,'rare'),chest_rig:I('Utility Chest Rig',980,1),field_sling:I('Field Sling Bag',420,.65),expedition_pack:I('Expedition Rucksack',3400,2.9,'epic'),security_rig:I('Security Chest Rig',1350,1.25),tactical_rig:I('Tactical Chest Rig',2250,1.55,'rare'),assault_rig:I('Assault Chest Rig',3600,1.9,'epic'),slick_carrier:I('Slick Plate Carrier',2800,3.4,'rare'),heavy_plate_carrier:I('Heavy Plate Carrier',7600,5.8,'epic'),armor_plate_lvl2:I('Level II Armor Plate',1200,1.6),armor_plate_lvl3:I('Level III Armor Plate',2400,2.2,'rare'),armor_plate_lvl4:I('Level IV Armor Plate',3900,2.8,'rare'),armor_plate_lvl5:I('Level V Armor Plate',6100,3.2,'epic'),armor_plate_lvl6:I('Level VI Armor Plate',8800,3.8,'epic'),fast_helmet:I('FAST Ballistic Helmet',3900,1.25,'rare')
+  ,ammo_12g_slug:I('12 Gauge Rifled Slug',42,.045,'rare'),ammo_12g_flechette:I('12 Gauge Flechette',58,.041,'rare')
+  ,mag_pm_8:I('PM 8-rd Magazine',145,.16),mag_g17_17:I('G17 17-rd Magazine',260,.27),mag_g17_33:I('G17 33-rd Extended Magazine',540,.42,'rare')
+  ,mag_1911_8:I('1911 8-rd Magazine',220,.22),mag_1911_15:I('1911 15-rd Extended Magazine',490,.36,'rare')
+  ,mag_mp5_30:I('MP5 30-rd Magazine',420,.48),mag_mp5_50:I('MP5 50-rd Drum',1120,.88,'epic')
+  ,mag_ak74_30:I('AK-74 30-rd Magazine',510,.52),mag_ak74_45:I('AK-74 45-rd Extended Magazine',790,.69,'rare'),mag_ak74_75:I('AK-74 75-rd Drum',1850,1.28,'epic')
+  ,mag_m4_30:I('STANAG 30-rd Magazine',590,.47,'rare'),mag_m4_40:I('STANAG 40-rd Extended Magazine',880,.61,'rare'),mag_m4_60:I('M4 60-rd Drum',1760,1.02,'epic')
+  ,mag_saiga_8:I('Saiga-12 8-rd Magazine',680,.72,'rare'),mag_saiga_12:I('Saiga-12 12-rd Extended Magazine',1180,.94,'rare'),mag_saiga_20:I('Saiga-12 20-rd Drum',2350,1.46,'epic')
+  ,mag_vector_25:I('Vector 25-rd Magazine',520,.41,'rare'),mag_vector_40:I('Vector 40-rd Extended Magazine',930,.59,'rare'),mag_vector_50:I('Vector 50-rd Drum',1680,.91,'epic')
+
 }
+
+
+const dynamicWeight=(entry:any)=>{const base=catalog[entry.id];if(!base)return 0;const data=entry.item_data||{};if(String(entry.id).startsWith('ammo_'))return base.weight*Math.max(0,Number(data.rounds??1)||0);if(String(entry.id).startsWith('mag_')&&Array.isArray(data.contents))return base.weight+data.contents.reduce((n:number,a:string)=>n+(catalog[a]?.weight||0),0);return base.weight}
+const dynamicValue=(entry:any)=>{const base=catalog[entry.id];if(!base)return 0;const data=entry.item_data||{};if(String(entry.id).startsWith('ammo_'))return base.value*Math.max(0,Number(data.rounds??1)||0);if(String(entry.id).startsWith('mag_')&&Array.isArray(data.contents))return base.value+data.contents.reduce((n:number,a:string)=>n+(catalog[a]?.value||0),0);return base.value}
 
 Deno.serve(async(req)=>{
   const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'}
@@ -19,15 +32,15 @@ Deno.serve(async(req)=>{
     const authHeader=req.headers.get('Authorization')||''
     const userClient=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:authHeader}}})
     const {data:{user}}=await userClient.auth.getUser();if(!user)return new Response(JSON.stringify({error:'unauthorized'}),{status:401,headers:{...cors,'Content-Type':'application/json'}})
-    const body=await req.json(),ids:Array<string>=Array.isArray(body.items)?body.items:[]
+    const body=await req.json(),raw:Array<any>=Array.isArray(body.items)?body.items:[],items=raw.map(x=>typeof x==='string'?{id:x}:{id:x?.id||x?.item_id,item_data:x?.item_data||x||{}}),ids=items.map(x=>x.id)
     if(ids.length>60)throw new Error('Invalid extraction payload.')
     const invalid=ids.find(id=>!catalog[id]);if(invalid)throw new Error('Unknown recovered item: '+invalid)
     if(ids.filter(id=>id==='portable_generator').length>1)throw new Error('Invalid heavy haul count.')
-    const packWeight=ids.filter(id=>id!=='portable_generator').reduce((n,id)=>n+catalog[id].weight,0);if(packWeight>112.05)throw new Error('Field pack weight exceeded.')
+    const packWeight=items.filter(x=>x.id!=='portable_generator').reduce((n,x)=>n+dynamicWeight(x),0);if(packWeight>112.05)throw new Error('Field pack weight exceeded.')
     const zones=['Industrial Fringe','Mercy Clinic','Route 17 Checkpoint'];const zone=zones.includes(body.zone)?body.zone:'Industrial Fringe'
-    const duration=Math.max(1,Math.min(7200,Number(body.duration_seconds)||1)),total=ids.reduce((n,id)=>n+catalog[id].value,0)
+    const duration=Math.max(1,Math.min(7200,Number(body.duration_seconds)||1)),total=items.reduce((n,x)=>n+dynamicValue(x),0)
     const admin=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-    const rows=ids.map(id=>({item_id:id,item_name:catalog[id].name,value:catalog[id].value,weight:catalog[id].weight,rarity:catalog[id].rarity}))
+    const rows=items.map(({id,item_data})=>({item_id:id,item_name:catalog[id].name,value:dynamicValue({id,item_data}),weight:dynamicWeight({id,item_data}),rarity:catalog[id].rarity,item_data:item_data||{}}))
     const {data:commit,error}=await admin.rpc('record_extraction',{p_user_id:user.id,p_zone:zone,p_duration:duration,p_total:total,p_items:rows,p_has_generator:ids.includes('portable_generator')});if(error)throw error
     return new Response(JSON.stringify(commit),{headers:{...cors,'Content-Type':'application/json'}})
   }catch(e:any){return new Response(JSON.stringify({error:String(e?.message||e)}),{status:400,headers:{...cors,'Content-Type':'application/json'}})}
