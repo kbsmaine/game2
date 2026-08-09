@@ -55,7 +55,7 @@
 @media(max-width:900px){.inventory-shell{overflow:auto}.tarkov-inventory-layout{display:block;overflow:auto}.tarkov-character-panel canvas{height:420px}.tactical-containers-panel{overflow:visible}.t-container-grid,.t-container-grid.rig-grid,.t-container-grid.backpack-grid{grid-template-columns:repeat(4,minmax(70px,1fr))}}
 
 
-/* Build 2.6.9 — developer/admin item testing panel */
+/* Build 2.6.10 — aligned developer/admin item testing panel */
 .admin-shell{width:min(1500px,97vw);height:min(900px,95vh);background:linear-gradient(145deg,#101512fa,#080b09fa)}
 .admin-toolbar{display:grid;grid-template-columns:minmax(280px,1.5fr) minmax(170px,.65fr) minmax(110px,.35fr) minmax(190px,.65fr);gap:9px;padding:13px 18px;border-bottom:1px solid #2d3832;background:#0b100d}
 .admin-toolbar>div{min-width:0}.admin-toolbar label{display:block;font-size:6px;color:#76837b;letter-spacing:.12em;margin-bottom:5px}.admin-toolbar input,.admin-toolbar select{width:100%;height:34px;border:1px solid #3a4740;background:#111713;color:#dce2dd;padding:0 9px;font:600 9px var(--mono);outline:0}.admin-toolbar input:focus,.admin-toolbar select:focus{border-color:#97ae68}.admin-toolbar input::placeholder{color:#59655e}
@@ -64,3 +64,82 @@
 .admin-item-grid{padding:6px 18px 18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:6px;overflow:auto;flex:1;align-content:start}.admin-item-card{min-height:168px;border:1px solid #303c35;background:linear-gradient(145deg,#121815,#090d0b);padding:7px;display:grid;grid-template-rows:82px auto auto auto 1fr auto;position:relative}.admin-item-card.rare{border-color:#49645d}.admin-item-card.epic{border-color:#685a77}.admin-item-card.heavy{border-color:#7a5c40}.admin-item-card img{width:100%;height:82px;object-fit:contain;background:#070a08;border:1px solid #202923;padding:5px}.admin-item-card>span{font-size:6px;color:#718078;letter-spacing:.08em;margin-top:5px}.admin-item-card>b{font:700 13px/1.05 var(--cond);margin-top:2px}.admin-item-card small{font-size:6px;color:#6f7c74;margin-top:3px;line-height:1.4}.admin-item-card .admin-have{align-self:end;color:#91a087;margin:6px 0 4px}.admin-item-card button{border:1px solid #718455;background:#26321f;color:#dff0b9;padding:6px;font:700 8px var(--cond);letter-spacing:.06em}.admin-item-card button:hover{background:#344329}.admin-item-card button:disabled{opacity:.45;cursor:wait}
 .admin-warning{padding:8px 18px;border-top:1px solid #3b3227;background:#17120c;color:#a89579;font-size:7px}.admin-warning b{color:#d6a765}.admin-warning code{color:#cbd2cc}
 @media(max-width:900px){.admin-toolbar{grid-template-columns:1fr 1fr}.admin-item-grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr))}.admin-quickbar span{display:none}}
+
+
+/* Build 2.6.10 — admin catalog alignment / readability pass */
+.admin-shell{overflow:hidden}
+.admin-item-grid{
+  grid-template-columns:repeat(auto-fill,minmax(168px,1fr));
+  grid-auto-rows:214px;
+  gap:8px;
+  padding:8px 18px 18px;
+  scrollbar-gutter:stable;
+}
+.admin-item-card{
+  min-height:0;
+  height:214px;
+  overflow:hidden;
+  padding:7px;
+  display:grid;
+  grid-template-rows:82px 13px 30px 31px 15px 27px;
+  row-gap:2px;
+  align-items:start;
+}
+.admin-item-card img{
+  display:block;
+  width:100%;
+  height:82px;
+  min-height:82px;
+  margin:0;
+}
+.admin-item-card>span{
+  margin:3px 0 0;
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  line-height:10px;
+}
+.admin-item-card>b{
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  overflow:hidden;
+  min-width:0;
+  margin:0;
+  line-height:14px;
+  height:28px;
+  align-self:center;
+}
+.admin-item-card>small:not(.admin-have){
+  display:block;
+  margin:0;
+  height:29px;
+  overflow:hidden;
+  line-height:9px;
+}
+.admin-item-card .admin-have{
+  align-self:center;
+  margin:0;
+  line-height:13px;
+  height:13px;
+}
+.admin-item-card button{
+  align-self:stretch;
+  width:100%;
+  height:27px;
+  min-height:27px;
+  margin:0;
+  padding:0 6px;
+}
+.admin-grid-head{flex:0 0 auto}
+.admin-toolbar,.admin-quickbar,.admin-warning,.panel-head{flex:0 0 auto}
+@media(max-width:1100px){
+  .admin-item-grid{grid-template-columns:repeat(auto-fill,minmax(154px,1fr));grid-auto-rows:210px}
+  .admin-item-card{height:210px;grid-template-rows:78px 13px 30px 31px 15px 27px}
+  .admin-item-card img{height:78px;min-height:78px}
+}
+@media(max-width:700px){
+  .admin-toolbar{grid-template-columns:1fr}
+  .admin-item-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding-left:10px;padding-right:10px}
+}

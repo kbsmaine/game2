@@ -1,0 +1,9 @@
+DEADHAUL BUILD 2.6.10 — ADMIN UI ALIGNMENT PASS
+
+- Rebuilt admin item cards around fixed internal rows so every catalog tile aligns.
+- Fixed GIVE buttons overlapping/drifting into the next catalog row.
+- Fixed inconsistent title/stat/stash-count vertical placement between items.
+- Added two-line title clamping and descriptor clipping to keep long item names from changing card height.
+- Increased catalog row spacing and added stable scrollbar gutter.
+- Improved responsive admin grid sizing for narrower screens.
+- All Build 2.6.9 admin spawning and gameplay systems are retained.
