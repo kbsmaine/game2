@@ -1,0 +1,9 @@
+DEADHAUL Build 2.5.1 — Mixamo First-Person Rifle Pose
+
+- Ch15 first-person arms now follow the authored Mixamo rifle animations directly.
+- Procedural IK is disabled for Ch15 weapon holding by default.
+- First-person gun attaches to the animated Mixamo right-hand bone.
+- Added per-weapon `mixamoFp` position/rotation/scale offsets in data/models.json.
+- Rifle idle/aim/walk/run/sprint clips now drive the visible Ch15 arm pose.
+- Weapon recoil only applies a small whole-viewmodel kick instead of fighting the authored hand pose.
+- Local test port 8795.

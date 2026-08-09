@@ -1,0 +1,12 @@
+DEADHAUL Build 2.5.9 — Animated Enemy Character Pass
+
+- Converted supplied Ch18_nonPBR.fbx, Ch35_nonPBR.fbx, and Swat.fbx to compact skinned browser GLBs.
+- Ch18, Ch35 and Swat now replace the three placeholder raider visual models by tier.
+- Retargeted all 12 current Ch15 authored animation clips to each enemy skeleton using rest-pose deltas.
+- Enemy pistols automatically use pistol clips; rifles/SMGs/shotguns use the rifle locomotion set for now.
+- Added authored enemy idle/walk/run/aim state selection.
+- Enemy weapons attach to the animated right hand.
+- Added bone-following head/chest/pelvis/arm/leg enemy hit zones.
+- Stops authored animation on death before DEADHAUL's existing death/fall system takes over.
+- Included tools/import_enemy_models.py for future Mixamo enemy imports.
+- Local test port: 8803.

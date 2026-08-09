@@ -1,0 +1,14 @@
+DEADHAUL BUILD 2.6.6 — AUTHORED ENEMY DEATHS + SOFT SETTLE
+
+- Integrated Standing Death Forward 01.fbx as death_forward.
+- Integrated Death.fbx as death_generic.
+- Integrated Death From The Front.fbx as death_front_hit.
+- Retargeted all three clips to enemy_ch18, enemy_ch35, and enemy_swat.
+- Death direction now influences which authored clip plays.
+- Removed the procedural full-body collapse as the normal death path.
+- Added subtle damped secondary head/arm/leg motion near impact and after the animation lands.
+- No Havok impulse is applied during normal enemy deaths.
+- Corpse search trigger follows the animated chest throughout the fall.
+- Existing stash, gear, bunker customization, item thumbnails, UI sounds, footsteps, and enemy AI retained.
+
+Local test port: 8810

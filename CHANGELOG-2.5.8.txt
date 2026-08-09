@@ -1,0 +1,11 @@
+DEADHAUL Build 2.5.8 — Pistol Mixamo Animation Set
+
+- Imported both supplied Mixamo pistol FBXs into player_ch15.glb, player_ch15_fp_arms.glb, and player_ch15_fp_lower.glb.
+- Added pistol_idle, pistol_aim_idle, pistol_walk, pistol_run, and pistol_sprint authored clips.
+- Makarov, Glock 17, and 1911 now automatically select the pistol animation set.
+- Pistols no longer fall back to rifle_idle/rifle_walk/rifle_run during normal gameplay states.
+- World body, first-person arms, lower-body awareness rig, and inventory character preview all use the pistol set.
+- Existing rifle/SMG/shotgun/bolt behavior is unchanged.
+- Existing F6 alignment, right-handed first-person mirror, animated-hand weapon follow, and 2.5.7 render-freeze fix are retained.
+- Added tools/import_pistol_mixamo.py for future compatible Mixamo pistol clip imports.
+- Local test port: 8802.
