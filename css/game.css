@@ -154,3 +154,31 @@
 
 /* Build 2.6.12 — persistent magazines / ammo feeding */
 .active-feed-controls{margin-top:8px;border:1px solid #334038;background:#0a0f0c;padding:9px;display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:58px}.active-feed-controls:empty{display:none}.active-feed-controls span{display:block;color:#7f8e84;font:700 7px var(--mono);letter-spacing:.12em}.active-feed-controls b{display:block;color:#d9e2dc;font:700 12px var(--cond);margin:2px 0}.active-feed-controls small{display:block;color:#7f8b84;font-size:7px;line-height:1.35;max-width:260px}.active-feed-controls>div:last-child{display:flex;gap:5px;flex-shrink:0}.active-feed-controls button{border:1px solid #4a5b50;background:#151d18;color:#dce5de;padding:7px 8px;font:700 7px var(--cond);letter-spacing:.05em}.active-feed-controls button:hover:not(:disabled){border-color:#91aa63;color:#eff8dd}.active-feed-controls button:disabled{opacity:.35;cursor:not-allowed}
+
+/* 2.6.13.1 inventory slot action layout fix */
+.equip-slot{
+  min-height:96px;
+  padding-bottom:10px;
+}
+.equip-slot.wide{
+  min-height:96px;
+}
+.weapon-slot{
+  min-height:108px;
+}
+.equip-slot b{
+  display:block;
+  line-height:1.15;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.equip-slot .equip-actions{
+  position:static;
+  left:auto;
+  right:auto;
+  bottom:auto;
+  margin-top:8px;
+}
+.equip-slot .equip-actions button{
+  min-height:22px;
+}
