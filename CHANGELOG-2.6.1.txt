@@ -1,0 +1,15 @@
+DEADHAUL BUILD 2.6.1
+
+- Added Babylon Havok Physics V2 initialization.
+- Replaced normal enemy death path with true skeleton ragdolls using BABYLON.Ragdoll.
+- Added static Havok collision bodies for level box/proxy collision geometry.
+- Death impulse now transfers into the physics ragdoll.
+- Corpse SEARCH BODY trigger follows the moving physics corpse.
+- Retained manual death flop only as a Havok initialization fallback.
+- Split safehouse systems into two independent UIs/stations.
+- Quartermaster station is now STASH & DISPLAY.
+- Workbench station now opens BUNKER CUSTOMIZATION.
+- Added wall finishes, floor finishes, light colors, light level, furnishing presets and clutter density.
+- Bunker furnishing presets rebuild visible prop layouts live and persist locally.
+- Preserved all Build 2.6.0 stash, item thumbnail, drop, equip/unequip, prepared backpack, footsteps, tactile UI audio and body-awareness systems.
+- Fresh test port: 8805.

@@ -1,0 +1,13 @@
+DEADHAUL BUILD 2.6.3
+
+ANATOMICAL SHOOTER RAGDOLL REBUILD
+- Replaced Babylon Ragdoll helper's unrestricted runtime joints with custom Havok Physics V2 6DOF constraints.
+- Human joint limits for chest, neck/head, shoulders, elbows, hips and knees.
+- Heavier pelvis/chest mass distribution and fewer tiny physics bodies.
+- Removed dramatic death knockback; bullets give only a tiny directional torso nudge.
+- Conservative collision proxies, no corpse self-collision, zero bounce, high floor friction.
+- Activation spike cap only during the first 0.18 s; natural gravity-driven collapse afterward.
+- Corpse auto-freezes only after it has genuinely settled (or after a 5 s failsafe), eliminating endless Havok micro-jitter.
+- Existing safehouse, persistent stash, customization, item icons, footsteps, UI audio, Ch15 body awareness, player/enemy animation systems retained.
+
+Local test port: 8807

@@ -1,0 +1,9 @@
+DEADHAUL Build 2.5.7
+
+- F6 weapon alignment is now the permanent neutral transform.
+- Mixamo hand-follow carries that exact gun-to-hand offset through walk/run/sprint/ADS.
+- Gun offset rotates around the animated right-hand anchor instead of merely adding hand translation.
+- Closing F6 immediately recalibrates the neutral Mixamo hand reference to the newly tuned mount.
+- No IK reintroduced.
+- Vector default remains position [0.12,-0.25,0.44], rotation [0,3.14159,0], scale 0.75.
+- Local test port 8800.

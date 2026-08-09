@@ -1,0 +1,919 @@
+{
+  "version": 13,
+  "characters": {
+    "player_ch15": {
+      "file": "player_ch15",
+      "label": "Ch15 Operator",
+      "scale": 1.0,
+      "weaponBone": "Hand_R",
+      "firstPersonFile": "player_ch15_fp_arms",
+      "singleSkinnedMesh": true,
+      "boneAliases": {
+        "Hips": "mixamorig:Hips",
+        "Spine": "mixamorig:Spine",
+        "Chest": "mixamorig:Spine2",
+        "Neck": "mixamorig:Neck",
+        "Head": "mixamorig:Head",
+        "UpperArm_L": "mixamorig:LeftArm",
+        "LowerArm_L": "mixamorig:LeftForeArm",
+        "Hand_L": "mixamorig:LeftHand",
+        "UpperArm_R": "mixamorig:RightArm",
+        "LowerArm_R": "mixamorig:RightForeArm",
+        "Hand_R": "mixamorig:RightHand",
+        "UpperLeg_L": "mixamorig:LeftUpLeg",
+        "LowerLeg_L": "mixamorig:LeftLeg",
+        "Foot_L": "mixamorig:LeftFoot",
+        "UpperLeg_R": "mixamorig:RightUpLeg",
+        "LowerLeg_R": "mixamorig:RightLeg",
+        "Foot_R": "mixamorig:RightFoot"
+      },
+      "firstPersonStyle": {
+        "sleeveColor": "#3b433d",
+        "gloveColor": "#202522"
+      },
+      "firstPersonBody": {
+        "enabled": true,
+        "cameraHeight": 1.68,
+        "cameraForward": 0.08,
+        "rootBackOffset": 0.0,
+        "rootYOffset": 0.0,
+        "yawOffset": 0.0,
+        "notes": "Build 2.6.0: lower-body awareness plus a headless chest/armor proxy. Camera is offset forward and downward pitch is limited so looking down shows torso/chest before legs instead of looking straight through the body.",
+        "hideHeadGearFromLocal": true,
+        "file": "player_ch15_fp_lower",
+        "headlessLocalBody": true,
+        "localGearMode": "none"
+      },
+      "firstPersonPreserveMaterials": true,
+      "firstPersonTransform": {
+        "position": [
+          0.0,
+          -1.56,
+          0.055
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": 1.0,
+        "notes": "Build 2.5.8: authored Mixamo weapon-class poses drive the arms. Local Ch15 first-person arm rendering is mirrored on X for correct handedness. No IK is used."
+      },
+      "authoredLocomotion": {
+        "enabled": true,
+        "unarmedIdle": "unarmed_idle",
+        "unarmedWalk": "unarmed_walk",
+        "rifleIdle": "rifle_idle",
+        "rifleAimIdle": "rifle_aim_idle",
+        "rifleWalk": "rifle_walk",
+        "rifleRun": "rifle_run",
+        "rifleSprintHighReady": "rifle_sprint",
+        "useHighReadySprint": false,
+        "blendSpeed": 0.1,
+        "speedRatios": {
+          "unarmedWalk": 1.85,
+          "rifleWalk": 1.45,
+          "rifleRun": 1.35,
+          "rifleSprintHighReady": 1.55,
+          "pistolWalk": 1.05,
+          "pistolRun": 1.0,
+          "pistolSprint": 1.0
+        },
+        "pistolIdle": "pistol_idle",
+        "pistolAimIdle": "pistol_aim_idle",
+        "pistolWalk": "pistol_walk",
+        "pistolRun": "pistol_run",
+        "pistolSprint": "pistol_sprint"
+      },
+      "firstPersonAuthoredWeaponPose": {
+        "enabled": true,
+        "useIK": false,
+        "attachGunToRightHand": false,
+        "weaponBone": "Hand_R",
+        "idleClip": "rifle_idle",
+        "aimClip": "rifle_aim_idle",
+        "walkClip": "rifle_walk",
+        "runClip": "rifle_run",
+        "sprintClip": "rifle_sprint",
+        "useHighReadySprint": false,
+        "notes": "Build 2.5.8: weapon-class authored poses. Pistols use dedicated Mixamo pistol clips; long guns keep the rifle set. Mixamo owns the arms and the gun follows the authored hands. No IK is used.",
+        "weaponMount": "camera",
+        "wristCorrection": {
+          "right": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "left": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "followAnimatedHands": true,
+        "handFollowPosition": 1.0,
+        "handFollowRotation": 1.0,
+        "handFollowWarmupFrames": 6,
+        "pistolIdleClip": "pistol_idle",
+        "pistolAimClip": "pistol_aim_idle",
+        "pistolWalkClip": "pistol_walk",
+        "pistolRunClip": "pistol_run",
+        "pistolSprintClip": "pistol_sprint"
+      },
+      "firstPersonMirrorX": true
+    },
+    "player_01": {
+      "file": "player_01",
+      "label": "Operator 01",
+      "scale": 1.0,
+      "weaponBone": "Hand_R",
+      "firstPersonFile": "fp_arms",
+      "firstPersonStyle": {
+        "sleeveColor": "#39483f",
+        "gloveColor": "#222a27"
+      },
+      "firstPersonBody": {
+        "enabled": false
+      }
+    },
+    "player_02": {
+      "file": "player_02",
+      "label": "Operator 02",
+      "scale": 1.0,
+      "weaponBone": "Hand_R",
+      "firstPersonFile": "fp_arms",
+      "firstPersonStyle": {
+        "sleeveColor": "#3f464f",
+        "gloveColor": "#202528"
+      },
+      "firstPersonBody": {
+        "enabled": false
+      }
+    },
+    "player_03": {
+      "file": "player_03",
+      "label": "Operator 03",
+      "scale": 1.0,
+      "weaponBone": "Hand_R",
+      "firstPersonFile": "fp_arms",
+      "firstPersonStyle": {
+        "sleeveColor": "#51483c",
+        "gloveColor": "#28251f"
+      },
+      "firstPersonBody": {
+        "enabled": false
+      }
+    }
+  },
+  "firstPerson": {
+    "file": "fp_arms",
+    "weaponBone": "Hand_R",
+    "basePosition": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "baseRotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": 1.0,
+    "animationNotes": "Authored clips may be embedded in the first-person arms GLB. Bone names must remain UpperArm_L, LowerArm_L, Hand_L, UpperArm_R, LowerArm_R, Hand_R."
+  },
+  "raiders": [
+    {
+      "file": "enemy_ch18",
+      "label": "Scav Raider",
+      "weaponBone": "Hand_R",
+      "authoredAnimations": true,
+      "boneHitboxes": true,
+      "animationSet": "auto",
+      "scale": 1.0,
+      "weaponMount": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": 1.0
+      }
+    },
+    {
+      "file": "enemy_ch35",
+      "label": "Contract Raider",
+      "weaponBone": "Hand_R",
+      "authoredAnimations": true,
+      "boneHitboxes": true,
+      "animationSet": "auto",
+      "scale": 1.0,
+      "weaponMount": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": 1.0
+      }
+    },
+    {
+      "file": "enemy_swat",
+      "label": "Armored SWAT Raider",
+      "weaponBone": "Hand_R",
+      "authoredAnimations": true,
+      "boneHitboxes": true,
+      "animationSet": "auto",
+      "scale": 1.0,
+      "weaponMount": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": 1.0
+      }
+    }
+  ],
+  "weapons": {
+    "makarov": {
+      "fp": {
+        "position": [
+          0.0,
+          -0.02,
+          0.02
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.02
+        ],
+        "scale": 0.72
+      },
+      "world": {
+        "position": [
+          0.0,
+          -0.01,
+          0.02
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.02
+        ],
+        "scale": 0.62
+      },
+      "mixamoFp": {
+        "position": [
+          0.055,
+          -0.205,
+          0.61
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.0
+        ],
+        "scale": 0.72,
+        "notes": "Build 2.5.3: camera-relative imaginary-rifle mount. X=left/right, Y=up/down, Z=forward/back. Mixamo controls the arms; tune only these values to line the real weapon up between the animated hands."
+      },
+      "animationSet": "pistol"
+    },
+    "glock17": {
+      "fp": {
+        "position": [
+          0.0,
+          -0.02,
+          0.02
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.02
+        ],
+        "scale": 0.7
+      },
+      "world": {
+        "position": [
+          0.0,
+          -0.01,
+          0.02
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.02
+        ],
+        "scale": 0.6
+      },
+      "mixamoFp": {
+        "position": [
+          0.055,
+          -0.205,
+          0.61
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.0
+        ],
+        "scale": 0.7,
+        "notes": "Build 2.5.3: camera-relative imaginary-rifle mount. X=left/right, Y=up/down, Z=forward/back. Mixamo controls the arms; tune only these values to line the real weapon up between the animated hands."
+      },
+      "animationSet": "pistol"
+    },
+    "pistol1911": {
+      "fp": {
+        "position": [
+          0.0,
+          -0.02,
+          0.02
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.02
+        ],
+        "scale": 0.7
+      },
+      "world": {
+        "position": [
+          0.0,
+          -0.01,
+          0.02
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.02
+        ],
+        "scale": 0.6
+      },
+      "mixamoFp": {
+        "position": [
+          0.055,
+          -0.205,
+          0.61
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.0
+        ],
+        "scale": 0.7,
+        "notes": "Build 2.5.3: camera-relative imaginary-rifle mount. X=left/right, Y=up/down, Z=forward/back. Mixamo controls the arms; tune only these values to line the real weapon up between the animated hands."
+      },
+      "animationSet": "pistol"
+    },
+    "mp5": {
+      "fp": {
+        "position": [
+          0.0,
+          -0.03,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.72
+      },
+      "world": {
+        "position": [
+          0.0,
+          -0.02,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.62
+      },
+      "mixamoFp": {
+        "position": [
+          0.085,
+          -0.205,
+          0.76
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.0
+        ],
+        "scale": 0.68,
+        "notes": "Build 2.5.3: camera-relative imaginary-rifle mount. X=left/right, Y=up/down, Z=forward/back. Mixamo controls the arms; tune only these values to line the real weapon up between the animated hands."
+      },
+      "animationSet": "rifle"
+    },
+    "ak74": {
+      "fp": {
+        "position": [
+          0.0,
+          -0.03,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.72
+      },
+      "world": {
+        "position": [
+          0.0,
+          -0.02,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.6
+      },
+      "mixamoFp": {
+        "position": [
+          0.095,
+          -0.2,
+          0.82
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.0
+        ],
+        "scale": 0.69,
+        "notes": "Build 2.5.3: camera-relative imaginary-rifle mount. X=left/right, Y=up/down, Z=forward/back. Mixamo controls the arms; tune only these values to line the real weapon up between the animated hands."
+      },
+      "animationSet": "rifle"
+    },
+    "m4a1": {
+      "fp": {
+        "position": [
+          0.0,
+          -0.03,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.72
+      },
+      "world": {
+        "position": [
+          0.0,
+          -0.02,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.6
+      },
+      "mixamoFp": {
+        "position": [
+          0.095,
+          -0.2,
+          0.82
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.0
+        ],
+        "scale": 0.69,
+        "notes": "Build 2.5.3: camera-relative imaginary-rifle mount. X=left/right, Y=up/down, Z=forward/back. Mixamo controls the arms; tune only these values to line the real weapon up between the animated hands."
+      },
+      "animationSet": "rifle"
+    },
+    "sks": {
+      "fp": {
+        "position": [
+          0.0,
+          -0.03,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.68
+      },
+      "world": {
+        "position": [
+          0.0,
+          -0.02,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.56
+      },
+      "mixamoFp": {
+        "position": [
+          0.095,
+          -0.2,
+          0.82
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.0
+        ],
+        "scale": 0.68,
+        "notes": "Build 2.5.3: camera-relative imaginary-rifle mount. X=left/right, Y=up/down, Z=forward/back. Mixamo controls the arms; tune only these values to line the real weapon up between the animated hands."
+      },
+      "animationSet": "rifle"
+    },
+    "mosin": {
+      "fp": {
+        "position": [
+          0.0,
+          -0.03,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.64
+      },
+      "world": {
+        "position": [
+          0.0,
+          -0.02,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.53
+      },
+      "mixamoFp": {
+        "position": [
+          0.095,
+          -0.2,
+          0.92
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.0
+        ],
+        "scale": 0.67,
+        "notes": "Build 2.5.3: camera-relative imaginary-rifle mount. X=left/right, Y=up/down, Z=forward/back. Mixamo controls the arms; tune only these values to line the real weapon up between the animated hands."
+      },
+      "animationSet": "rifle"
+    },
+    "pump12": {
+      "fp": {
+        "position": [
+          0.0,
+          -0.03,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.68
+      },
+      "world": {
+        "position": [
+          0.0,
+          -0.02,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.56
+      },
+      "mixamoFp": {
+        "position": [
+          0.1,
+          -0.205,
+          0.88
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.0
+        ],
+        "scale": 0.66,
+        "notes": "Build 2.5.3: camera-relative imaginary-rifle mount. X=left/right, Y=up/down, Z=forward/back. Mixamo controls the arms; tune only these values to line the real weapon up between the animated hands."
+      },
+      "animationSet": "rifle"
+    },
+    "saiga12": {
+      "fp": {
+        "position": [
+          0.0,
+          -0.03,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.7
+      },
+      "world": {
+        "position": [
+          0.0,
+          -0.02,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.58
+      },
+      "mixamoFp": {
+        "position": [
+          0.095,
+          -0.2,
+          0.82
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.0
+        ],
+        "scale": 0.69,
+        "notes": "Build 2.5.3: camera-relative imaginary-rifle mount. X=left/right, Y=up/down, Z=forward/back. Mixamo controls the arms; tune only these values to line the real weapon up between the animated hands."
+      },
+      "animationSet": "rifle"
+    },
+    "r700": {
+      "fp": {
+        "position": [
+          0.0,
+          -0.03,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.64
+      },
+      "world": {
+        "position": [
+          0.0,
+          -0.02,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.53
+      },
+      "mixamoFp": {
+        "position": [
+          0.095,
+          -0.2,
+          0.92
+        ],
+        "rotation": [
+          0.0,
+          3.14159,
+          0.0
+        ],
+        "scale": 0.67,
+        "notes": "Build 2.5.3: camera-relative imaginary-rifle mount. X=left/right, Y=up/down, Z=forward/back. Mixamo controls the arms; tune only these values to line the real weapon up between the animated hands."
+      },
+      "animationSet": "rifle"
+    },
+    "vector": {
+      "fp": {
+        "position": [
+          0.0,
+          -0.03,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.72
+      },
+      "world": {
+        "position": [
+          0.0,
+          -0.02,
+          0.03
+        ],
+        "rotation": [
+          0.02,
+          3.14159,
+          0.01
+        ],
+        "scale": 0.62
+      },
+      "mixamoFp": {
+        "position": [
+          0.12,
+          -0.25,
+          0.44
+        ],
+        "rotation": [
+          0,
+          3.14159,
+          0
+        ],
+        "scale": 0.75,
+        "notes": "Build 2.5.7: user-tuned idle alignment. This is the neutral camera-space mount; runtime preserves this exact F6 neutral transform as a rigid offset from the animated Mixamo hands during walk/run/sprint/ADS.",
+        "wristCorrection": {
+          "right": [
+            0,
+            0,
+            0
+          ],
+          "left": [
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "animationSet": "rifle"
+    }
+  },
+  "gear": {
+    "helmet": {
+      "file": "gear_helmet",
+      "bone": "Head",
+      "position": [
+        0,
+        0.1,
+        0.01
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1.0,
+      "hideFirstPerson": true,
+      "firstPersonOverlay": "ballistic"
+    },
+    "soft_armor": {
+      "file": "gear_soft_armor",
+      "bone": "Chest",
+      "position": [
+        0,
+        -0.02,
+        -0.02
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1.0
+    },
+    "plate_carrier": {
+      "file": "gear_plate_carrier",
+      "bone": "Chest",
+      "position": [
+        0,
+        -0.02,
+        -0.04
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1.0
+    },
+    "chest_rig": {
+      "file": "gear_chest_rig",
+      "bone": "Chest",
+      "position": [
+        0,
+        -0.08,
+        -0.19
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1.0
+    },
+    "scav_pack": {
+      "file": "gear_scav_pack",
+      "bone": "Chest",
+      "position": [
+        0,
+        -0.06,
+        0.25
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1.0
+    },
+    "patrol_pack": {
+      "file": "gear_patrol_pack",
+      "bone": "Chest",
+      "position": [
+        0,
+        -0.06,
+        0.29
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1.0
+    },
+    "heavy_visor_helmet": {
+      "file": "gear_heavy_visor",
+      "bone": "Head",
+      "position": [
+        0,
+        0.09,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1.0,
+      "firstPersonOverlay": "visor"
+    },
+    "gas_mask": {
+      "file": "gear_gas_mask",
+      "bone": "Head",
+      "position": [
+        0,
+        0.01,
+        -0.02
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1.0,
+      "firstPersonOverlay": "gasmask"
+    }
+  },
+  "handStyles": {
+    "tactical_gloves": {
+      "gloveColor": "#202725"
+    },
+    "work_gloves": {
+      "gloveColor": "#4a382a"
+    },
+    "winter_gloves": {
+      "gloveColor": "#3c4245"
+    }
+  }
+}

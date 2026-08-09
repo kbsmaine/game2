@@ -1,0 +1,23 @@
+DEADHAUL BUILD 2.2.0 — BODY AWARENESS / INVENTORY PREVIEW / ACTION ANIMATIONS
+
+- Build 2.1.1 remains the movement/raid-transition baseline.
+- Added 3D survivor preview to TAB inventory.
+- Preview renders selected character, helmet, armor, rig, backpack, gloves and active weapon.
+- Local first-person body now shows only lower-body meshes for body awareness when looking down; head/torso/arms remain hidden to prevent camera-inside-head clipping.
+- Added first-person glove/sleeve styling.
+- Added hand equipment slot and Tactical / Work / Winter gloves.
+- Added helmet overlays for standard ballistic helmet, heavy visor helmet and gas mask.
+- Added custom heavy visor and gas mask models.
+- Added M67 fragmentation grenade model and gameplay.
+- G throws grenade from field inventory.
+- Grenades use gravity, bouncing, timed fuse, blast falloff and damage.
+- Added first-person action framework with authored GLB animation support and procedural fallbacks.
+- Per-weapon reload/equip/action arm clips configured in data/weapons.json.
+- Weapon GLBs may also contain reload/equip/action clips for magazine, bolt, slide or pump animation.
+- Medical items now use timed first-person treatment animations instead of instant healing.
+- Medkit/bandage props are shown in the hands during use.
+- Firearm is hidden/lowered during grenade/medical actions.
+- Containers now perform a short physical open/search animation before loot UI appears.
+- Container GLBs can provide authored `open` / `open_<type>` clips; lid/drawer naming gets automatic fallback animation.
+- Added ANIMATION-GUIDE.md.
+- Added new items to browser and Supabase extraction catalogs.

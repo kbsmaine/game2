@@ -1,0 +1,54 @@
+DEADHAUL BUILD 2.3.1 — FULL FIRST-PERSON ANIMATION PASS
+
+BASELINE
+- Built directly on Build 2.2.0 / stable 2.1.1 controller and raid flow.
+- Existing account, inventory, combat, map, loot, character, audio, extraction and backend systems retained.
+
+FIRST-PERSON WEAPON HOLDING
+- Added persistent two-hand weapon-ready poses; arms no longer return to the straight bind pose.
+- Separate solved hold profiles for pistols, SMGs, rifles, shotguns and bolt-action rifles.
+- Individual weapon adjustments for all 12 current guns.
+- Right hand remains the weapon attachment hand (Hand_R).
+- Left hand is posed toward the support/grip area for each weapon class.
+
+MOVEMENT / AIM ANIMATION
+- Subtle idle breathing motion layered over the grip pose.
+- Movement sway now moves the complete posed arm rig rather than straight arms.
+- ADS pose/offset and smooth FOV transition.
+- Sprint lowers/cants the weapon and changes both arms.
+- Equip/raise animation when entering a raid or switching weapons.
+
+RELOADS / ACTIONS
+- Pistol magazine reload choreography.
+- SMG reload choreography.
+- Rifle magazine reload choreography.
+- SKS top-loading style choreography.
+- Bolt-rifle reload choreography.
+- Pump-shotgun tube-loading choreography.
+- Saiga-style detachable-magazine shotgun reload choreography.
+- Pump shotgun fore-end moves during action cycling.
+- Detachable magazines move during reload when the weapon model exposes a mag_* mesh.
+- Bolt/receiver movement is attempted on bolt-action models where an appropriate mesh exists.
+- Existing dry-fire behavior retained: exactly one click per trigger pull when empty.
+
+SHARED ACTIONS
+- Grenade throw keyframes.
+- Medkit treatment keyframes.
+- Bandage treatment keyframes.
+- Container-search reach animation.
+- Physical crate lids / drawers still open before the loot interface appears.
+
+WORLD CHARACTERS
+- Added weapon-holding upper-body poses to the survivor world rig, inventory preview and live raiders.
+- Ragdoll/death pose system still takes over on death.
+
+DATA / MODDING
+- New data/animations.json contains the built-in procedural animation library.
+- Weapon-specific animation/audio event config remains in data/weapons.json.
+- Custom authored GLB animation clips still override matching procedural action clips automatically.
+- data/models.json continues to control weapon attachment position, rotation and scale.
+
+QOL
+- Removed duplicated HANDS slot in TAB inventory.
+- Build/version bumped to 2.3.1.
+- Local test port changed to 8787.
