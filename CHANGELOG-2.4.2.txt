@@ -1,9 +1,0 @@
-DEADHAUL Build 2.4.2 - First-person character consolidation
-
-- Ch15 remains the authoritative full world/combat player.
-- Replaced generic fp_arms for Ch15 with a Ch15-derived skinned arm-only viewmodel.
-- Replaced headless full-body local render with Ch15 lower-body-only waist/legs/feet render.
-- Removed local 3D armor/rig/backpack meshes from the owning camera layer to eliminate interior-body clipping.
-- Full equipped gear remains on the authoritative Ch15 world rig and TAB preview.
-- Added per-character firstPersonTransform in data/models.json for live arm alignment tuning.
-- Local port 8791.
