@@ -120,7 +120,70 @@
         "pistolRunClip": "pistol_run",
         "pistolSprintClip": "pistol_sprint"
       },
-      "firstPersonMirrorX": true
+      "firstPersonMirrorX": true,
+      "firstPersonIntegratedM4": {
+        "enabled": true,
+        "file": "player_ch15_fp_ue_m4a1",
+        "position": [
+          0.0,
+          -1.48,
+          0.06
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": 1.0,
+        "mirrorX": false,
+        "preserveMaterials": true,
+        "notes": "Build 2.6.14: optional integrated UE5 M4A1 first-person viewmodel. Uses the actual recovered UE-pack arms+weapon rig and embedded authored animations. Only activates when the active weapon is m4a1; other weapons continue using the standard DeadHaul first-person rig.",
+        "authoredPose": {
+          "enabled": true,
+          "useIK": false,
+          "attachGunToRightHand": false,
+          "weaponBone": "Hand_R",
+          "idleClip": "AS_FP_M4A1_Idle_Grip_Pose",
+          "aimClip": "AS_FP_M4A1_Aim_Grip_Pose",
+          "walkClip": "AS_FP_M4A1_Walk_Grip_F_Loop",
+          "runClip": "AS_FP_M4A1_Grip_Run_Loop",
+          "sprintClip": "AS_FP_M4A1_Run_Loop",
+          "useHighReadySprint": false,
+          "followAnimatedHands": false,
+          "handFollowPosition": 0.0,
+          "handFollowRotation": 0.0,
+          "handFollowWarmupFrames": 0,
+          "wristCorrection": {
+            "right": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "left": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "events": {
+          "reload": {
+            "armsClip": "AS_FP__M4A1_Reload_Grip",
+            "weaponClip": "",
+            "preset": "rifle_reload"
+          },
+          "equip": {
+            "armsClip": "AS_FP_M4A1_Equip",
+            "weaponClip": "",
+            "preset": "equip"
+          },
+          "action": {
+            "armsClip": "AS_FP_M4A1_Fire_Grip",
+            "weaponClip": "",
+            "preset": "rifle_action"
+          }
+        }
+      }
     },
     "player_01": {
       "file": "player_01",

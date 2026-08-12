@@ -66,6 +66,7 @@
     "player_03.glb",
     "player_ch15.glb",
     "player_ch15_fp_arms.glb",
+    "player_ch15_fp_ue_m4a1.glb",
     "player_ch15_fp_lower.glb",
     "portable_generator.glb",
     "raider_01.glb",
@@ -94,5 +95,5 @@
     "workbench.glb",
     "wrecked_pickup.glb"
   ],
-  "model_count": 92
+  "model_count": 93
 }

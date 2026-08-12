@@ -1,0 +1,36 @@
+DEAD HAUL UE M4A1 FIRST-PERSON INTEGRATION NOTES
+===============================================
+
+What was added
+- Integrated the recovered UE first-person M4A1 + arms rig as an optional first-person viewmodel.
+- Added model file: assets/models/player_ch15_fp_ue_m4a1.glb
+- The integrated UE viewmodel only activates when:
+  - selected character = player_ch15
+  - active weapon = m4a1
+- All other weapons still use the original Dead Haul first-person rig and weapon system.
+
+Files changed
+- js/game.js
+- data/models.json
+- assets/manifest.json
+- assets/models/player_ch15_fp_ue_m4a1.glb
+
+Config you can tweak
+- data/models.json
+  characters.player_ch15.firstPersonIntegratedM4.position
+  characters.player_ch15.firstPersonIntegratedM4.rotation
+  characters.player_ch15.firstPersonIntegratedM4.scale
+
+Current integrated animation mapping
+- Idle: AS_FP_M4A1_Idle_Grip_Pose
+- Aim: AS_FP_M4A1_Aim_Grip_Pose
+- Walk: AS_FP_M4A1_Walk_Grip_F_Loop
+- Run: AS_FP_M4A1_Grip_Run_Loop
+- Sprint: AS_FP_M4A1_Run_Loop
+- Reload: AS_FP__M4A1_Reload_Grip
+- Equip: AS_FP_M4A1_Equip
+
+Important limitation
+- This is a first-person viewmodel integration, not a full replacement of the third-person character mesh.
+- The world/third-person M4A1 still uses the game's existing world weapon model.
+- The M4A1 integrated viewmodel does not use the separate weapon alignment editor, because the weapon is built into the viewmodel rig.
