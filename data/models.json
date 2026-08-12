@@ -124,16 +124,8 @@
       "firstPersonIntegratedM4": {
         "enabled": true,
         "file": "player_ch15_fp_ue_m4a1",
-        "position": [
-          0.0,
-          -1.48,
-          0.06
-        ],
-        "rotation": [
-          0.0,
-          -180,
-          0.0
-        ],
+        "position": [-0.08, -1.46, 0.72],
+        "rotation": [0.0, 1.5707963267948966, 0.0],
         "scale": 1.0,
         "mirrorX": false,
         "preserveMaterials": true,
