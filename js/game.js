@@ -950,8 +950,8 @@
   function ensureMixamoMount(id){
     if(id==='m4a1'&&usesIntegratedM4Viewmodel()){
       const m=integratedM4ViewmodelCfg();
-      if(!Array.isArray(m.position))m.position=[0.08,-1.10,1.50];
-      if(!Array.isArray(m.rotation))m.rotation=[0,0,0];
+      if(!Array.isArray(m.position))m.position=[0,-1.63,0];
+      if(!Array.isArray(m.rotation))m.rotation=[0.03491,1.78024,0.03491];
       if(!Number.isFinite(Number(m.scale)))m.scale=1;
       if(!m.wristCorrection)m.wristCorrection={right:[0,0,0],left:[0,0,0]};
       return m;
@@ -990,7 +990,7 @@
   }
   function closeWeaponEditor(){if(!weaponEditorOpen)return;weaponEditorOpen=false;$('weaponAlignEditor')?.classList.add('hidden');calibrateMixamoWeaponFollowRef();resumePointer()}
   function toggleWeaponEditor(){weaponEditorOpen?closeWeaponEditor():openWeaponEditor()}
-  function resetWeaponEditor(original=true){const id=editorWeaponId();if(!id)return;if(id==='m4a1'&&usesIntegratedM4Viewmodel()){const m=integratedM4ViewmodelCfg(),src=original?{position:[0.08,-1.10,1.50],rotation:[0,0,0],scale:1}:{position:[0,-1.10,1.50],rotation:[0,0,0],scale:1};m.position=[...src.position];m.rotation=[...src.rotation];m.scale=src.scale;if(fpRig?.root){fpRig.root.position.set(...m.position);fpRig.root.rotation.set(...m.rotation);fpRig.root.scaling.setAll(m.scale)}syncWeaponEditorUi();toast(original?'UE M4 VIEWMODEL RESET':'UE M4 CENTERED');return}const src=original?(ORIGINAL_WEAPON_MOUNTS[id]||{}):{position:[0,-.20,.70],rotation:[0,Math.PI,0],scale:.75,wristCorrection:{right:[0,0,0],left:[0,0,0]}};MODEL_CONFIG.weapons[id].mixamoFp=JSON.parse(JSON.stringify(src));syncWeaponEditorUi();toast(original?'ORIGINAL CONFIG RESTORED':'WEAPON CENTERED')}
+  function resetWeaponEditor(original=true){const id=editorWeaponId();if(!id)return;if(id==='m4a1'&&usesIntegratedM4Viewmodel()){const m=integratedM4ViewmodelCfg(),src=original?{position:[0,-1.63,0],rotation:[0.03491,1.78024,0.03491],scale:1}:{position:[0,-1.63,0],rotation:[0.03491,1.78024,0.03491],scale:1};m.position=[...src.position];m.rotation=[...src.rotation];m.scale=src.scale;if(fpRig?.root){fpRig.root.position.set(...m.position);fpRig.root.rotation.set(...m.rotation);fpRig.root.scaling.setAll(m.scale)}syncWeaponEditorUi();toast(original?'UE M4 VIEWMODEL RESET':'UE M4 CENTERED');return}const src=original?(ORIGINAL_WEAPON_MOUNTS[id]||{}):{position:[0,-.20,.70],rotation:[0,Math.PI,0],scale:.75,wristCorrection:{right:[0,0,0],left:[0,0,0]}};MODEL_CONFIG.weapons[id].mixamoFp=JSON.parse(JSON.stringify(src));syncWeaponEditorUi();toast(original?'ORIGINAL CONFIG RESTORED':'WEAPON CENTERED')}
   function saveWeaponEditorBrowser(){const id=editorWeaponId(),m=ensureMixamoMount(id);if(!id||!m)return;weaponEditorSaved[id]=JSON.parse(JSON.stringify({position:arr3(m.position),rotation:arr3(m.rotation),scale:Number(m.scale??1),wristCorrection:m.wristCorrection||{right:[0,0,0],left:[0,0,0]}}));localStorage.setItem(WEAPON_EDITOR_STORAGE_KEY,JSON.stringify(weaponEditorSaved));syncWeaponEditorUi();toast('ALIGNMENT SAVED IN THIS BROWSER')}
   function clearWeaponEditorBrowser(){const id=editorWeaponId();if(!id)return;delete weaponEditorSaved[id];localStorage.setItem(WEAPON_EDITOR_STORAGE_KEY,JSON.stringify(weaponEditorSaved));resetWeaponEditor(true);toast('BROWSER OVERRIDE CLEARED')}
   async function copyWeaponEditorConfig(){const id=editorWeaponId(),m=ensureMixamoMount(id);if(!id||!m)return;const clean={position:arr3(m.position).map(v=>+v.toFixed(5)),rotation:arr3(m.rotation).map(v=>+v.toFixed(5)),scale:+Number(m.scale??1).toFixed(4),wristCorrection:{right:arr3(m.wristCorrection?.right).map(v=>+v.toFixed(5)),left:arr3(m.wristCorrection?.left).map(v=>+v.toFixed(5))}};const txt='"mixamoFp": '+JSON.stringify(clean,null,2);try{await navigator.clipboard.writeText(txt);toast('CONFIG COPIED TO CLIPBOARD')}catch{const out=$('alignCopyOutput');if(out){out.value=txt;out.classList.remove('hidden');out.select()}toast('COPY BLOCK SHOWN BELOW')}}

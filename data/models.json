@@ -125,19 +125,19 @@
         "enabled": true,
         "file": "player_ch15_fp_ue_m4a1",
         "position": [
-          0.08,
-          -1.1,
-          1.5
+          0.0,
+          -1.63,
+          0.0
         ],
         "rotation": [
-          0.0,
-          0.0,
-          0.0
+          0.03491,
+          1.78024,
+          0.03491
         ],
         "scale": 1.0,
         "mirrorX": false,
         "preserveMaterials": true,
-        "notes": "Build 2.6.14b: UE-pack first-person M4A1 viewmodel aligned to Babylon camera space. UE rifle forward axis is converted from local X to camera +Z with +90 degrees Y and pushed forward to keep the sleeves/receiver out of the near plane.",
+        "notes": "Build 2.6.14c: user-tuned in-game UE-pack M4A1 viewmodel alignment captured from the F6 live editor. Position [0,-1.63,0], rotation radians [0.03491,1.78024,0.03491] (~[2,102,2] degrees).",
         "authoredPose": {
           "enabled": true,
           "useIK": false,

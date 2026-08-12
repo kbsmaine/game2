@@ -1,0 +1,11 @@
+DEAD HAUL UE M4A1 INTEGRATION V4
+================================
+
+Baked user-tuned first-person UE M4A1 rig alignment:
+position: [0, -1.63, 0]
+rotation radians: [0.03491, 1.78024, 0.03491]
+rotation degrees: approximately [2, 102, 2]
+scale: 1
+
+The F6 alignment editor still edits the entire integrated UE arms+gun viewmodel when M4A1 is active.
+These values are now also the Reset defaults.
