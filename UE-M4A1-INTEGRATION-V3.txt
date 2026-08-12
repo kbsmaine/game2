@@ -1,0 +1,24 @@
+UE M4A1 INTEGRATION V3
+======================
+
+Fixes in this build:
+- Restored native model direction: rotation [0,0,0].
+- New baseline camera-relative transform: position [0.08,-1.10,1.50].
+- Reload/equip authored clips are no longer overwritten by idle every frame.
+- Integrated reload animation is sped to match Dead Haul's 2.25 second reload gameplay timer.
+- Integrated idle/ADS now use the actual looping UE clips instead of one-frame poses.
+- F6 now edits the entire UE arms + M4 viewmodel while M4A1 is equipped.
+- Old v4 browser alignment values are ignored by using a new v5 storage key.
+- UE hand aliases added so action props can resolve hand bones.
+
+F6 tuning baseline:
+X = 0.08
+Y = -1.10
+Z = 1.50
+Rot X = 0
+Rot Y = 0
+Rot Z = 0
+Scale = 1.0
+
+If the model is correctly oriented but you want it closer/larger, lower Pos Z.
+If too close/large, raise Pos Z.

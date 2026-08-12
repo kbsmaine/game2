@@ -34,3 +34,9 @@ Important limitation
 - This is a first-person viewmodel integration, not a full replacement of the third-person character mesh.
 - The world/third-person M4A1 still uses the game's existing world weapon model.
 - The M4A1 integrated viewmodel does not use the separate weapon alignment editor, because the weapon is built into the viewmodel rig.
+
+2.6.14b camera-space alignment
+- position: [-0.08, -1.46, 0.72]
+- rotation: [0, 1.5707963267948966, 0]  // +90 deg Y
+- scale: 1.0
+- Do not use +/-180 Y as the base orientation; the source rifle axis is X while Babylon FPS forward is Z.
