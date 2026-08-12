@@ -6,8 +6,9 @@
   <title>DEADHAUL // Game Client</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/game.css?v=2.6.13.1" />
+  <link rel="stylesheet" href="css/game.css?v=2.6.13.2" />
 </head>
 <body>
   <canvas id="renderCanvas" tabindex="0"></canvas>
@@ -148,6 +149,39 @@
           </section>
           <section class="stash-storage-panel">
             <div class="bag-head"><div><span>RECOVERED INVENTORY</span><b id="stashCount">0 ITEMS</b></div><small>Everything you successfully extract with remains available here.</small></div>
+            <div class="stash-filter-bar">
+              <div class="stash-filter-row">
+                <label class="stash-filter-control" for="stashSearch"><span>SEARCH STASH</span><input id="stashSearch" class="stash-search" type="search" autocomplete="off" placeholder="NAME, TYPE, OR ITEM ID" /></label>
+                <label class="stash-filter-control" for="stashSort"><span>SORT ITEMS</span><select id="stashSort" class="stash-sort">
+                  <option value="recent">RECENTLY ACQUIRED</option>
+                  <option value="oldest">OLDEST ACQUIRED</option>
+                  <option value="category">CATEGORY</option>
+                  <option value="name_asc">NAME // A-Z</option>
+                  <option value="name_desc">NAME // Z-A</option>
+                  <option value="value_desc">VALUE // HIGH-LOW</option>
+                  <option value="value_asc">VALUE // LOW-HIGH</option>
+                  <option value="weight_desc">WEIGHT // HEAVY-LIGHT</option>
+                  <option value="weight_asc">WEIGHT // LIGHT-HEAVY</option>
+                  <option value="rarity_desc">RARITY // HIGH-LOW</option>
+                </select></label>
+              </div>
+              <div class="stash-category-tabs" role="group" aria-label="Filter stash by category">
+                <button class="active" type="button" data-stash-category="all">ALL</button>
+                <button type="button" data-stash-category="weapons">WEAPONS</button>
+                <button type="button" data-stash-category="magazines">MAGS</button>
+                <button type="button" data-stash-category="ammo">AMMO</button>
+                <button type="button" data-stash-category="armor">ARMOR</button>
+                <button type="button" data-stash-category="rigs">RIGS</button>
+                <button type="button" data-stash-category="backpacks">PACKS</button>
+                <button type="button" data-stash-category="medical">MEDS</button>
+                <button type="button" data-stash-category="supplies">SUPPLIES</button>
+                <button type="button" data-stash-category="industrial">INDUSTRIAL</button>
+                <button type="button" data-stash-category="tech">TECH</button>
+                <button type="button" data-stash-category="valuables">VALUABLES</button>
+                <button type="button" data-stash-category="gear">GEAR</button>
+                <button type="button" data-stash-category="misc">MISC</button>
+              </div>
+            </div>
             <div id="stashGridGame" class="bag-grid stash-grid-game"></div>
           </section>
           <section class="stash-display-panel">
@@ -275,7 +309,7 @@
     <script src="https://cdn.babylonjs.com/havok/HavokPhysics_umd.js"></script>
   <script src="config.js"></script>
   <script src="js/auth.js?v=2.6.13"></script>
-  <script src="js/world-content.js?v=1.0.1"></script>
-  <script src="js/game.js?v=2.6.13"></script>
+  <script src="js/world-content.js?v=1.0.2"></script>
+  <script src="js/game.js?v=2.6.13.3"></script>
 </body>
 </html>

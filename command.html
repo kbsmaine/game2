@@ -6,9 +6,10 @@
   <title>DEADHAUL // Command Center</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/site.css" />
-  <link rel="stylesheet" href="css/command.css" />
+  <link rel="stylesheet" href="css/command.css?v=2.6.13.1" />
 </head>
 <body class="command-body">
   <div class="noise"></div>
@@ -66,6 +67,35 @@
 
     <section id="view-stash" class="command-view">
       <div class="view-title"><span class="section-tag">// LOGISTICS</span><h2>STASH</h2></div>
+      <div class="command-stash-toolbar">
+        <label><span>SEARCH</span><input id="commandStashSearch" type="search" autocomplete="off" placeholder="NAME, TYPE, OR ITEM ID" /></label>
+        <label><span>CATEGORY</span><select id="commandStashCategory">
+          <option value="all">ALL CATEGORIES</option>
+          <option value="weapons">WEAPONS</option>
+          <option value="magazines">MAGAZINES</option>
+          <option value="ammo">AMMUNITION</option>
+          <option value="gear">GEAR</option>
+          <option value="medical">MEDICAL</option>
+          <option value="supplies">SUPPLIES</option>
+          <option value="industrial">INDUSTRIAL</option>
+          <option value="tech">TECH</option>
+          <option value="valuables">VALUABLES</option>
+          <option value="misc">MISC</option>
+        </select></label>
+        <label><span>SORT</span><select id="commandStashSort">
+          <option value="recent">RECENTLY ACQUIRED</option>
+          <option value="oldest">OLDEST ACQUIRED</option>
+          <option value="category">CATEGORY</option>
+          <option value="name_asc">NAME // A-Z</option>
+          <option value="name_desc">NAME // Z-A</option>
+          <option value="value_desc">VALUE // HIGH-LOW</option>
+          <option value="value_asc">VALUE // LOW-HIGH</option>
+          <option value="weight_desc">WEIGHT // HEAVY-LIGHT</option>
+          <option value="weight_asc">WEIGHT // LIGHT-HEAVY</option>
+          <option value="rarity_desc">RARITY // HIGH-LOW</option>
+        </select></label>
+        <div class="command-stash-count"><span>VISIBLE</span><b id="commandStashCount">0 / 0</b></div>
+      </div>
       <div id="stashGrid" class="stash-grid"></div>
     </section>
 
@@ -101,6 +131,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/command.js"></script>
+  <script src="js/command.js?v=2.6.13.1"></script>
 </body>
 </html>

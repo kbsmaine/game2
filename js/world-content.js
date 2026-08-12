@@ -218,10 +218,11 @@
     block(scene,'painting',[.04,.77,1.3],[x-.045,y,z],m[color]||m.pictureB,{collide:false})
   }
 
-  function addInteriorLight(scene,m,x,y,z,intensity=.42){
+  function addInteriorLight(scene,m,x,y,z,intensity=.42,active=true){
     sphere(scene,'lamp_glow',.18,[x,y,z],m.light,{collide:false,pickable:false});
+    if(!active)return null;
     const light=new BABYLON.PointLight(nextName('interior_light'),new BABYLON.Vector3(x,y-.12,z),scene);
-    light.diffuse=new BABYLON.Color3(.82,.68,.45);light.intensity=intensity;light.range=11
+    light.diffuse=new BABYLON.Color3(.82,.68,.45);light.intensity=intensity;light.range=11;return light
   }
 
   function createBuilding(scene,m,spec){
@@ -239,7 +240,10 @@
       if(b.w>=19)segmentedWall(scene,b.name+'_room','x',b.w*.43,[b.x-b.w*.285,b.z+b.d*.12],baseY,storyHeight-.12,.18,m.interior,{center:0,width:1.18,height:2.25});
       if(level>0)floorWithOpening(scene,m,b,baseY,opening);
       addStoryWindows(scene,m,b,level);
-      addInteriorLight(scene,m,b.x-b.w*.27,baseY+storyHeight-.35,b.z-b.d*.12,level===0?.4:.32);
+      // One real point light per building keeps Babylon safely below WebGL's
+      // uniform-block limit. Upper-floor fixtures remain emissive, and the
+      // ground-floor light's range illuminates the complete structure.
+      addInteriorLight(scene,m,b.x-b.w*.27,baseY+storyHeight-.35,b.z-b.d*.12,level===0?.4:.32,level===0);
       if(level<b.stories-1)stairFlight(scene,m,baseY,stairX,stairZ,storyHeight,stairRun,stairWidth)
     }
     block(scene,b.name+'_foundation',[b.w-.34,.08,b.d-.34],[b.x,.01,b.z],m.floor,{collide:false});
