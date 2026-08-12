@@ -8,14 +8,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/game.css?v=2.6.13.2" />
+  <link rel="stylesheet" href="css/game.css?v=2.6.13.5" />
 </head>
 <body>
   <canvas id="renderCanvas" tabindex="0"></canvas>
   <div id="gameUi">
     <div class="top-hud">
       <div class="brandHud"><b>DEADHAUL <small>BUILD 2.6.10</small></b><span id="locationLabel">BUNKER // NODE 17</span></div>
-      <div class="raid-center"><div id="raidTimer" class="raid-timer hidden">00:00</div><div id="compass">N</div></div>
+      <div class="raid-center"><div id="raidTimer" class="raid-timer hidden">00:00</div><div id="raidClock" class="raid-world-clock hidden">09:00 // DAY</div><div id="compass">N</div></div>
       <div class="hud-actions"><button id="inventoryButton" type="button">TAB // INVENTORY</button><button id="alignButton" type="button">ALIGN [F6]</button><button id="adminButton" type="button">ADMIN [F7]</button><button id="settingsButton" type="button">SETTINGS</button><a href="command.html">COMMAND</a></div>
     </div>
 
@@ -54,11 +54,18 @@
       <div class="deployment-card"><span>// SURFACE LINK</span><h2>DEPLOYING</h2><div class="deployment-bar"><i></i></div><p id="deploymentStatus">PREPARING RAID</p></div>
     </div>
 
-    <div id="mapPanel" class="fullscreen-panel hidden">
+    <div id="mapPanel" class="fullscreen-panel hidden" role="dialog" aria-modal="true" aria-labelledby="mapPanelTitle">
       <div class="panel-shell map-shell">
-        <div class="panel-head"><div><span>// NODE 17 DEPLOYMENT TERMINAL</span><h2>SELECT SURFACE ZONE</h2></div><button class="panel-close" data-close="mapPanel">CLOSE ×</button></div>
+        <div class="panel-head"><div><span>// NODE 17 DEPLOYMENT TERMINAL</span><h2 id="mapPanelTitle">SELECT SURFACE ZONE</h2></div><button class="panel-close" data-close="mapPanel">CLOSE ×</button></div>
         <div id="mapCards" class="map-cards"></div>
-        <div class="map-footer"><div><span>SELECTED</span><b id="selectedMapName">INDUSTRIAL FRINGE</b></div><button id="deploySelected" class="danger-button">DEPLOY TO SURFACE</button></div>
+        <div class="map-footer">
+          <div class="map-selection-summary"><span>SELECTED RAID</span><b id="selectedMapName">INDUSTRIAL FRINGE</b><small id="selectedRaidTime">DAY // 09:00</small></div>
+          <div class="raid-time-select"><span>SELECT DEPLOYMENT TIME</span><div id="raidTimeChoices" class="raid-time-options" role="radiogroup" aria-label="Select raid time">
+            <button type="button" class="selected" data-raid-time="day" role="radio" aria-checked="true"><span>DAY</span><b>09:00</b><small>SUNRISE ROUTE</small></button>
+            <button type="button" data-raid-time="night" role="radio" aria-checked="false"><span>NIGHT</span><b>21:00</b><small>MOONLIT ROUTE</small></button>
+          </div></div>
+          <button id="deploySelected" class="danger-button">DEPLOY TO SURFACE</button>
+        </div>
       </div>
     </div>
 
@@ -310,6 +317,6 @@
   <script src="config.js"></script>
   <script src="js/auth.js?v=2.6.13"></script>
   <script src="js/world-content.js?v=1.0.2"></script>
-  <script src="js/game.js?v=2.6.13.4"></script>
+  <script src="js/game.js?v=2.6.13.7"></script>
 </body>
 </html>
