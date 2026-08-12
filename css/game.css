@@ -182,3 +182,36 @@
 .equip-slot .equip-actions button{
   min-height:22px;
 }
+
+/* Deployment terminal: keep the selected-zone action inside the viewport. */
+.map-shell{
+  min-height:0;
+  overflow:hidden;
+}
+.map-shell>.panel-head,
+.map-shell>.map-footer{
+  flex:0 0 auto;
+}
+.map-shell>.map-cards{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-x:hidden;
+  overflow-y:auto;
+  align-content:start;
+  scrollbar-gutter:stable;
+}
+.map-shell>.map-footer{
+  position:relative;
+  z-index:2;
+  background:#0b100e;
+  box-shadow:0 -10px 24px #0008;
+}
+@media(max-height:800px){
+  .map-shell>.map-cards{
+    gap:10px;
+    padding:14px 18px;
+  }
+  .map-shell .map-card{
+    min-height:300px;
+  }
+}
